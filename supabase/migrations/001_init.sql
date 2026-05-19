@@ -25,7 +25,7 @@ create table kb_chunks (
 );
 
 create index idx_kb_chunks_document on kb_chunks (document_id);
-create index idx_kb_chunks_embedding on kb_chunks using ivfflat (embedding vector_cosine_ops) with (lists = 100);
+create index idx_kb_chunks_embedding on kb_chunks using hnsw (embedding vector_cosine_ops);
 
 -- Email audit log
 create table messages (
@@ -47,7 +47,7 @@ create table messages (
   created_at timestamptz not null default now()
 );
 
-create index idx_messages_thread on messages (gmail_thread_id);
+create index idx_messages_thread_received on messages (gmail_thread_id, received_at desc);
 create index idx_messages_received_at on messages (received_at desc);
 
 -- Gmail OAuth token (singleton row, one mailbox per deployment)
@@ -74,6 +74,8 @@ returns table (
   similarity float
 )
 language plpgsql
+stable
+set search_path = public, pg_temp
 as $$
 begin
   return query
@@ -88,3 +90,10 @@ begin
   limit match_count;
 end;
 $$;
+
+-- Enable Row Level Security (defense-in-depth; service_role bypasses RLS,
+-- so no policies are needed for app access)
+alter table kb_documents enable row level security;
+alter table kb_chunks    enable row level security;
+alter table messages     enable row level security;
+alter table oauth_tokens enable row level security;
