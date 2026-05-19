@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>inbox-ai admin</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; color: #222; }
+  h1 { margin-bottom: 4px; }
+  .sub { color: #666; margin-top: 0; }
+  section { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; vertical-align: top; }
+  .drop { border: 2px dashed #ccc; padding: 40px; text-align: center; border-radius: 8px; color: #888; }
+  .drop.hover { border-color: #2a7; color: #2a7; }
+  button { padding: 6px 12px; cursor: pointer; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
+  .pill-sent { background: #e0f5e0; color: #2a7; }
+  .pill-skipped { background: #f0f0f0; color: #666; }
+  .pill-failed { background: #fde0e0; color: #c33; }
+</style>
+</head>
+<body>
+<h1>inbox-ai</h1>
+<p class="sub">Admin dashboard</p>
+
+<section>
+  <h2>Gmail connection</h2>
+  <div id="status">Loading...</div>
+  <p><a href="/oauth/start">Connect / reconnect Gmail</a></p>
+</section>
+
+<section>
+  <h2>Knowledge base</h2>
+  <div id="drop" class="drop">Drag a PDF here, or <input type="file" id="file" accept="application/pdf"></div>
+  <table id="docs"><thead><tr><th>File</th><th>Status</th><th>Chunks</th><th>Uploaded</th><th></th></tr></thead><tbody></tbody></table>
+</section>
+
+<section>
+  <h2>Recent activity</h2>
+  <table id="msgs"><thead><tr><th>Received</th><th>From</th><th>Subject</th><th>Class</th><th>Reply</th></tr></thead><tbody></tbody></table>
+</section>
+
+<script>
+async function loadStatus() {
+  const r = await fetch('/admin/api/status');
+  const data = await r.json();
+  document.getElementById('status').textContent = data.gmail
+    ? `Connected: ${data.gmail.email} (updated ${new Date(data.gmail.updated_at).toLocaleString()})`
+    : 'Not connected. Click below to authorize Gmail.';
+}
+
+async function loadDocs() {
+  const r = await fetch('/admin/api/documents');
+  const docs = await r.json();
+  const tbody = document.querySelector('#docs tbody');
+  tbody.innerHTML = '';
+  for (const d of docs) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${escapeHtml(d.filename)}</td>
+      <td>${d.status}${d.error ? `<br><small>${escapeHtml(d.error)}</small>` : ''}</td>
+      <td>${d.chunk_count ?? '-'}</td>
+      <td>${new Date(d.uploaded_at).toLocaleString()}</td>
+      <td><button data-id="${d.id}" class="del">Delete</button></td>`;
+    tbody.appendChild(tr);
+  }
+  tbody.querySelectorAll('button.del').forEach((b) => b.addEventListener('click', async () => {
+    if (!confirm('Delete this document and its chunks?')) return;
+    await fetch('/admin/api/documents/' + b.dataset.id, { method: 'DELETE' });
+    loadDocs();
+  }));
+}
+
+async function loadMsgs() {
+  const r = await fetch('/admin/api/messages');
+  const msgs = await r.json();
+  const tbody = document.querySelector('#msgs tbody');
+  tbody.innerHTML = '';
+  for (const m of msgs) {
+    const tr = document.createElement('tr');
+    const pillClass = m.reply_status === 'sent' ? 'pill-sent' : m.reply_status === 'failed' ? 'pill-failed' : 'pill-skipped';
+    tr.innerHTML = `<td>${new Date(m.received_at).toLocaleString()}</td>
+      <td>${escapeHtml(m.from_address)}</td>
+      <td>${escapeHtml(m.subject || '')}</td>
+      <td>${m.classification || ''}</td>
+      <td><span class="pill ${pillClass}">${m.reply_status || ''}</span>${m.reply_reason ? `<br><small>${escapeHtml(m.reply_reason)}</small>` : ''}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+const drop = document.getElementById('drop');
+const fileInput = document.getElementById('file');
+['dragover', 'dragenter'].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.add('hover'); }));
+['dragleave', 'drop'].forEach((e) => drop.addEventListener(e, () => drop.classList.remove('hover')));
+drop.addEventListener('drop', async (ev) => {
+  ev.preventDefault();
+  for (const f of ev.dataTransfer.files) await uploadFile(f);
+  loadDocs();
+});
+fileInput.addEventListener('change', async () => {
+  for (const f of fileInput.files) await uploadFile(f);
+  fileInput.value = '';
+  loadDocs();
+});
+
+async function uploadFile(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  const r = await fetch('/admin/api/documents', { method: 'POST', body: fd });
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}));
+    alert('Upload failed: ' + (err.error || r.status));
+  }
+}
+
+loadStatus();
+loadDocs();
+loadMsgs();
+setInterval(loadMsgs, 30000);
+</script>
+</body>
+</html>
