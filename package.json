@@ -9,7 +9,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
+    "build": "tsc && node -e \"require('fs').cpSync('src/ui','dist/ui',{recursive:true})\"",
     "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -23,6 +23,7 @@
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
     "google-auth-library": "^10.6.2",
     "googleapis": "^171.4.0",
     "multer": "^2.1.1",

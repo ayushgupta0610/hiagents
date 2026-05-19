@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
+import rateLimit from 'express-rate-limit';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +10,14 @@ import { db } from '../db/client.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 attempts per IP per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many login attempts. Try again in 15 minutes.' },
+});
 
 export const adminRouter: Router = Router();
 
@@ -22,7 +31,7 @@ adminRouter.get('/login', (_req, res) => {
   </body></html>`);
 });
 
-adminRouter.post('/login', (req, res) => {
+adminRouter.post('/login', loginLimiter, (req, res) => {
   const pwd = typeof req.body?.password === 'string' ? req.body.password : '';
   if (!checkPassword(pwd)) {
     res.status(401).type('html').send('<p>Wrong password. <a href="/admin/login">Try again</a></p>');

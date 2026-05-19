@@ -34,6 +34,17 @@ async function tick(): Promise<void> {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         logger.error({ err: msg, id }, 'pipeline failed for message');
+        // Still mark read + label so it's visible in Gmail + not retried
+        try {
+          await markRead(id);
+        } catch {
+          /* ignore */
+        }
+        try {
+          await applyLabel(id, 'inbox-ai/failed');
+        } catch {
+          /* ignore */
+        }
       }
     }
   } catch (err) {

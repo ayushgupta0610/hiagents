@@ -79,61 +79,73 @@ export async function runPipeline(email: IncomingEmail): Promise<RunResult> {
     return { classification: 'skipped_thread', replyStatus: 'skipped' };
   }
 
-  // Classify
-  const verdict = await classify({
-    from: email.from,
-    subject: email.subject,
-    bodyText: email.bodyText,
-  });
-  if (verdict === 'other') {
-    await supabase.from('messages').insert({
-      ...baseRow,
-      classification: 'other',
-      reply_status: 'skipped',
-      reply_reason: 'classifier-other',
+  try {
+    // Classify
+    const verdict = await classify({
+      from: email.from,
+      subject: email.subject,
+      bodyText: email.bodyText,
     });
-    return { classification: 'other', replyStatus: 'skipped' };
-  }
+    if (verdict === 'other') {
+      await supabase.from('messages').insert({
+        ...baseRow,
+        classification: 'other',
+        reply_status: 'skipped',
+        reply_reason: 'classifier-other',
+      });
+      return { classification: 'other', replyStatus: 'skipped' };
+    }
 
-  // Retrieve
-  const query = `${email.subject}\n\n${email.bodyText}`;
-  const chunks = await search(query);
-  const topSim = chunks[0]?.similarity ?? 0;
+    // Retrieve
+    const query = `${email.subject}\n\n${email.bodyText}`;
+    const chunks = await search(query);
+    const topSim = chunks[0]?.similarity ?? 0;
 
-  if (chunks.length === 0) {
+    if (chunks.length === 0) {
+      await supabase.from('messages').insert({
+        ...baseRow,
+        classification: 'client_query',
+        top_similarity: 0,
+        reply_status: 'skipped',
+        reply_reason: 'no-kb-match',
+      });
+      return { classification: 'client_query', replyStatus: 'skipped', replyReason: 'no-kb-match' };
+    }
+
+    // Generate
+    const replyText = await generateReply({ email, chunks });
+
+    // Send via Gmail
+    const sentId = await sendReply({
+      threadId: email.gmailThreadId,
+      inReplyToMessageId: email.gmailMessageId,
+      originalMessageIdHeader: email.headers['message-id'],
+      to: email.from,
+      subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
+      bodyText: replyText,
+    });
+
     await supabase.from('messages').insert({
       ...baseRow,
       classification: 'client_query',
-      top_similarity: 0,
-      reply_status: 'skipped',
-      reply_reason: 'no-kb-match',
+      retrieved_chunk_ids: chunks.map((c) => c.id),
+      top_similarity: topSim,
+      reply_text: replyText,
+      reply_status: 'sent',
+      reply_sent_at: new Date().toISOString(),
+      reply_gmail_message_id: sentId,
     });
-    return { classification: 'client_query', replyStatus: 'skipped', replyReason: 'no-kb-match' };
+
+    logger.info({ id: email.gmailMessageId, topSim, chunks: chunks.length }, 'reply sent');
+    return { classification: 'client_query', replyStatus: 'sent' };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    await supabase.from('messages').insert({
+      ...baseRow,
+      classification: 'error',
+      reply_status: 'failed',
+      reply_reason: msg.slice(0, 500),
+    });
+    throw err;
   }
-
-  // Generate
-  const replyText = await generateReply({ email, chunks });
-
-  // Send via Gmail
-  const sentId = await sendReply({
-    threadId: email.gmailThreadId,
-    inReplyToMessageId: email.gmailMessageId,
-    to: email.from,
-    subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
-    bodyText: replyText,
-  });
-
-  await supabase.from('messages').insert({
-    ...baseRow,
-    classification: 'client_query',
-    retrieved_chunk_ids: chunks.map((c) => c.id),
-    top_similarity: topSim,
-    reply_text: replyText,
-    reply_status: 'sent',
-    reply_sent_at: new Date().toISOString(),
-    reply_gmail_message_id: sentId,
-  });
-
-  logger.info({ id: email.gmailMessageId, topSim, chunks: chunks.length }, 'reply sent');
-  return { classification: 'client_query', replyStatus: 'sent' };
 }

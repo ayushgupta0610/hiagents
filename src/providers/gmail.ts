@@ -208,6 +208,7 @@ export async function applyLabel(messageId: string, labelName: string): Promise<
 export interface SendReplyInput {
   threadId: string;
   inReplyToMessageId: string;
+  originalMessageIdHeader?: string; // RFC 5322 Message-ID from the original email's headers
   to: string;
   subject: string;
   bodyText: string;
@@ -215,11 +216,13 @@ export interface SendReplyInput {
 
 export async function sendReply(input: SendReplyInput): Promise<string> {
   const gmail = await gmailClient();
+  const rawMsgId = input.originalMessageIdHeader?.trim() ?? `<${input.inReplyToMessageId}>`;
+  const msgIdRef = rawMsgId.startsWith('<') ? rawMsgId : `<${rawMsgId}>`;
   const headerLines = [
     `To: ${input.to}`,
     `Subject: ${input.subject}`,
-    `In-Reply-To: <${input.inReplyToMessageId}>`,
-    `References: <${input.inReplyToMessageId}>`,
+    `In-Reply-To: ${msgIdRef}`,
+    `References: ${msgIdRef}`,
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset="UTF-8"',
     ...Object.entries(OUTGOING_LOOP_HEADERS).map(([k, v]) => `${k}: ${v}`),
