@@ -243,6 +243,11 @@ document.getElementById('classifier-skip').addEventListener('click', async () =>
 
 async function renderSummaryAndGoDone() {
   const s = await api('/admin/onboarding/api/state');
+  // The user has just saved (or accepted default) the classifier prompt —
+  // visually mark that step done even though onboarding_completed_at hasn't
+  // been set yet (that happens on the next click).
+  s.steps.classifier = true;
+  markDone(s.steps);
   const sum = document.getElementById('summary');
   const lines = [
     { label: `Workspace: ${s.tenant.name}`, ok: true },

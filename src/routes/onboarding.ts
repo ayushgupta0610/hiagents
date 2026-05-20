@@ -61,7 +61,10 @@ onboardingRouter.get('/api/state', requireAdmin, async (_req, res) => {
       mailbox: !!oauth?.email,
       persona: !!tenant.settings.persona.companyDescription,
       kb: (docsCount ?? 0) > 0,
-      classifier: true,
+      // Classifier shows "done" only after the full wizard is complete — during the
+      // wizard itself, it's the step the user is currently on (or hasn't reached yet),
+      // so showing it as already-done was misleading the progress bar.
+      classifier: !!tenant.onboardingCompletedAt,
       done: !!tenant.onboardingCompletedAt,
     },
   });
