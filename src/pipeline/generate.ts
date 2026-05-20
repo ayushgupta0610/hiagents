@@ -1,13 +1,16 @@
 import { chat } from '../providers/openrouter.js';
-import { env } from '../config.js';
 import type { RetrievedChunk, IncomingEmail } from '../types.js';
+import type { TenantSettings } from '../tenant/types.js';
 
 export interface GenerateInput {
+  tenantId: string;
+  settings: TenantSettings;
   email: IncomingEmail;
   chunks: RetrievedChunk[];
 }
 
-const SYSTEM_TEMPLATE = (tone: string, company: string, signature: string) => `You are an email assistant replying on behalf of ${company || 'the recipient'}. Tone: ${tone}.
+const SYSTEM_TEMPLATE = (tone: string, company: string, signature: string) =>
+  `You are an email assistant replying on behalf of ${company || 'the recipient'}. Tone: ${tone}.
 
 Rules:
 - Answer ONLY using the provided knowledge base context. If the context does not cover the question, say so politely and offer to follow up — do NOT invent facts.
@@ -24,7 +27,8 @@ function buildContextBlock(chunks: RetrievedChunk[]): string {
 }
 
 export async function generateReply(input: GenerateInput): Promise<string> {
-  const system = SYSTEM_TEMPLATE(env.TONE, env.COMPANY_DESCRIPTION, env.SIGNATURE);
+  const { persona } = input.settings;
+  const system = SYSTEM_TEMPLATE(persona.tone, persona.companyDescription, persona.signature);
   const context = buildContextBlock(input.chunks);
   const userPrompt = `Knowledge base context:
 ${context}
@@ -42,9 +46,11 @@ ${input.email.bodyText}
 Write the reply now. Plain text only.`;
 
   return await chat({
-    model: env.REPLY_MODEL,
+    model: input.settings.reply.model,
     temperature: 0.3,
     maxTokens: 800,
+    tenantId: input.tenantId,
+    kind: 'chat',
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: userPrompt },

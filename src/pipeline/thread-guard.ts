@@ -23,11 +23,15 @@ export function ownerHasReplied(
   return false;
 }
 
-export async function loadBotSentIdsForThread(gmailThreadId: string): Promise<Set<string>> {
+export async function loadBotSentIdsForThread(
+  tenantId: string,
+  gmailThreadId: string,
+): Promise<Set<string>> {
   const { db } = await import('../db/client.js');
   const { data, error } = await db()
     .from('messages')
     .select('reply_gmail_message_id')
+    .eq('tenant_id', tenantId)
     .eq('gmail_thread_id', gmailThreadId)
     .not('reply_gmail_message_id', 'is', null);
   if (error) throw new Error(`Failed to load bot-sent ids: ${error.message}`);

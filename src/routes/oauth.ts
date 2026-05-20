@@ -3,11 +3,13 @@ import { google } from 'googleapis';
 import {
   MAILBOX_SCOPES,
   getOAuthClient,
-  saveTokens,
+  saveTokensForTenant,
   buildMailboxAuthUrl,
   buildSigninAuthUrl,
 } from '../providers/gmail.js';
-import { requireAdmin, isAdminEmail, issueSessionForEmail, adminEmails } from '../lib/auth.js';
+import { requireAdmin, issueSessionForEmail } from '../lib/auth.js';
+import { findTenantForEmail, provisionTenant } from '../tenant/store.js';
+import { audit } from '../tenant/audit.js';
 import { logger } from '../lib/logger.js';
 
 export const oauthRouter: Router = Router();
@@ -21,36 +23,29 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
-// ============================================================
-// Mailbox connect flow (sensitive Gmail scopes — admin-only)
-// ============================================================
+// Mailbox connect flow — admin must be signed in; state encodes their tenant id
 oauthRouter.get('/start', requireAdmin, (_req, res) => {
-  res.redirect(buildMailboxAuthUrl());
-});
-
-// ============================================================
-// Admin sign-in flow (lightweight openid email profile scopes)
-// Public start endpoint; we gate by ADMIN_EMAILS whitelist in the callback.
-// ============================================================
-oauthRouter.get('/signin', (_req, res) => {
-  if (adminEmails().length === 0) {
+  const tenantId = res.locals.tenantId;
+  if (!tenantId) {
     res
-      .status(503)
+      .status(400)
       .type('html')
-      .send(
-        `<div style="font-family:system-ui;padding:40px;max-width:520px;margin:60px auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px"><h2 style="margin-top:0">Sign-in is not configured</h2><p style="color:#666;line-height:1.5">The administrator has not set <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px">ADMIN_EMAILS</code> in this deployment. Until they do, only password sign-in works.</p><p><a href="/admin/login" style="color:#4f46e5">Back to login</a></p></div>`,
-      );
+      .send('<p>You must be signed in to a workspace before connecting a mailbox.</p>');
     return;
   }
+  res.redirect(buildMailboxAuthUrl(tenantId));
+});
+
+// Admin sign-in flow — public, auto-provisions a tenant on first signin
+oauthRouter.get('/signin', (_req, res) => {
   res.redirect(buildSigninAuthUrl());
 });
 
-// ============================================================
-// Unified callback — routes on `state` (login | mailbox)
-// ============================================================
+// Unified callback — routes on `state`
 oauthRouter.get('/callback', async (req, res) => {
   const code = typeof req.query.code === 'string' ? req.query.code : null;
-  const state = typeof req.query.state === 'string' ? req.query.state : 'mailbox';
+  const stateRaw = typeof req.query.state === 'string' ? req.query.state : '';
+  const [stateKind, stateTenantId] = stateRaw.split(':');
   if (!code) {
     res.status(400).type('html').send('<p>Missing authorization code.</p>');
     return;
@@ -72,53 +67,66 @@ oauthRouter.get('/callback', async (req, res) => {
       return;
     }
 
-    if (state === 'login') {
-      if (!isAdminEmail(email)) {
-        logger.warn({ email }, 'sign-in denied: not in ADMIN_EMAILS');
-        res
-          .status(403)
-          .type('html')
-          .send(
-            `<div style="font-family:system-ui;padding:40px;max-width:520px;margin:60px auto;background:#fff;border:1px solid #fca5a5;border-radius:12px"><h2 style="margin-top:0;color:#dc2626">Access denied</h2><p style="color:#444;line-height:1.5"><strong>${escapeHtml(email)}</strong> is not authorized to sign in to this dashboard.</p><p style="color:#666;line-height:1.5">If you should have access, ask the administrator to add this email to <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px">ADMIN_EMAILS</code> in the deployment's <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px">.env</code>.</p><p><a href="/admin/login" style="color:#4f46e5">Back to login</a></p></div>`,
-          );
+    if (stateKind === 'login') {
+      let found = await findTenantForEmail(email);
+      if (!found) {
+        const tenant = await provisionTenant(email);
+        await audit(tenant.id, email, 'tenant.provisioned', { via: 'google-signin' });
+        logger.info({ email, tenantId: tenant.id }, 'auto-provisioned new tenant');
+        issueSessionForEmail(res, email, tenant.id);
+        await audit(tenant.id, email, 'auth.signin', { method: 'google' });
+        res.redirect('/admin/onboarding');
         return;
       }
-      issueSessionForEmail(res, email);
-      logger.info({ email }, 'admin signed in via google');
-      res.redirect('/admin');
+      await audit(found.tenant.id, email, 'auth.signin', { method: 'google' });
+      issueSessionForEmail(res, email, found.tenant.id);
+      res.redirect(found.tenant.onboardingCompletedAt ? '/admin' : '/admin/onboarding');
       return;
     }
 
-    // Mailbox connect flow (default)
-    if (!tokens.refresh_token) {
+    // Mailbox connect flow — state was "mailbox:<tenantId>"
+    if (stateKind === 'mailbox') {
+      if (!stateTenantId) {
+        res
+          .status(400)
+          .type('html')
+          .send('<p>Mailbox-connect state missing tenant. Restart the flow from /admin.</p>');
+        return;
+      }
+      if (!tokens.refresh_token) {
+        res
+          .status(400)
+          .type('html')
+          .send(
+            '<p>Missing refresh token. Revoke previous access at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a> and retry.</p>',
+          );
+        return;
+      }
+      await saveTokensForTenant(
+        stateTenantId,
+        {
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+          expiry_date: tokens.expiry_date ?? Date.now() + 3500_000,
+          scope: tokens.scope ?? MAILBOX_SCOPES.join(' '),
+        },
+        email,
+      );
+      await audit(stateTenantId, email, 'gmail.connected', {});
+      logger.info({ email, tenantId: stateTenantId }, 'gmail mailbox connected');
+      const safeEmail = escapeHtml(email);
       res
-        .status(400)
         .type('html')
         .send(
-          '<p>Missing refresh token in OAuth response. Revoke previous access at <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a> and retry.</p>',
+          `<div style="font-family:system-ui;padding:40px;max-width:520px;margin:60px auto;background:#fff;border:1px solid #86efac;border-radius:12px"><h2 style="margin-top:0;color:#16a34a">Gmail connected</h2><p style="color:#444">The bot will poll <strong>${safeEmail}</strong> and reply to client queries.</p><p><a href="/admin/onboarding#mailbox-return" style="color:#4f46e5;font-weight:500">Continue setup →</a></p></div>`,
         );
       return;
     }
 
-    await saveTokens(
-      {
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expiry_date: tokens.expiry_date ?? Date.now() + 3500_000,
-        scope: tokens.scope ?? MAILBOX_SCOPES.join(' '),
-      },
-      email,
-    );
-    logger.info({ email }, 'gmail mailbox connected');
-    const safeEmail = escapeHtml(email);
-    res
-      .type('html')
-      .send(
-        `<div style="font-family:system-ui;padding:40px;max-width:520px;margin:60px auto;background:#fff;border:1px solid #86efac;border-radius:12px"><h2 style="margin-top:0;color:#16a34a">Gmail connected</h2><p style="color:#444">The bot will poll <strong>${safeEmail}</strong> and reply to client queries.</p><p><a href="/admin" style="color:#4f46e5;font-weight:500">Go to admin →</a></p></div>`,
-      );
+    res.status(400).type('html').send(`<p>Unknown OAuth state: ${escapeHtml(stateRaw)}</p>`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.error({ err: msg, state }, 'oauth callback failed');
+    logger.error({ err: msg, state: stateRaw }, 'oauth callback failed');
     res.status(500).type('html').send(`<p>OAuth failed: ${escapeHtml(msg)}</p>`);
   }
 });

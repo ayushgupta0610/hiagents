@@ -20,7 +20,6 @@ export const SIGNIN_SCOPES = [
   'https://www.googleapis.com/auth/userinfo.profile',
 ];
 
-// Backwards-compat alias
 export const SCOPES = MAILBOX_SCOPES;
 
 export function getOAuthClient(): OAuth2Client {
@@ -31,13 +30,13 @@ export function getOAuthClient(): OAuth2Client {
   );
 }
 
-export function buildMailboxAuthUrl(): string {
+export function buildMailboxAuthUrl(tenantId: string): string {
   const client = getOAuthClient();
   return client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
     scope: MAILBOX_SCOPES,
-    state: 'mailbox',
+    state: `mailbox:${tenantId}`,
   });
 }
 
@@ -51,8 +50,12 @@ export function buildSigninAuthUrl(): string {
   });
 }
 
-export async function loadStoredTokens(): Promise<OAuth2Client | null> {
-  const { data, error } = await db().from('oauth_tokens').select('*').eq('id', 1).maybeSingle();
+export async function loadStoredTokensForTenant(tenantId: string): Promise<OAuth2Client | null> {
+  const { data, error } = await db()
+    .from('oauth_tokens')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
   if (error) throw new Error(`Failed to load oauth tokens: ${error.message}`);
   if (!data) return null;
   const oauth = getOAuthClient();
@@ -64,23 +67,30 @@ export async function loadStoredTokens(): Promise<OAuth2Client | null> {
   });
   oauth.on('tokens', async (tokens) => {
     if (tokens.access_token) {
-      await db()
-        .from('oauth_tokens')
-        .update({
-          access_token: tokens.access_token,
-          expires_at: tokens.expiry_date
-            ? new Date(tokens.expiry_date).toISOString()
-            : new Date(Date.now() + 3500_000).toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', 1);
-      logger.debug('refreshed gmail access token');
+      const patch: Record<string, unknown> = {
+        access_token: tokens.access_token,
+        expires_at: tokens.expiry_date
+          ? new Date(tokens.expiry_date).toISOString()
+          : new Date(Date.now() + 3500_000).toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      if (tokens.refresh_token) patch.refresh_token = tokens.refresh_token;
+      try {
+        await db().from('oauth_tokens').update(patch).eq('tenant_id', tenantId);
+        logger.debug({ tenantId }, 'refreshed gmail access token');
+      } catch (err) {
+        logger.error(
+          { tenantId, err: err instanceof Error ? err.message : String(err) },
+          'failed to persist refreshed token',
+        );
+      }
     }
   });
   return oauth;
 }
 
-export async function saveTokens(
+export async function saveTokensForTenant(
+  tenantId: string,
   tokens: {
     access_token: string;
     refresh_token: string;
@@ -93,7 +103,7 @@ export async function saveTokens(
     .from('oauth_tokens')
     .upsert(
       {
-        id: 1,
+        tenant_id: tenantId,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         expires_at: new Date(tokens.expiry_date).toISOString(),
@@ -101,12 +111,12 @@ export async function saveTokens(
         email,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: 'id' },
+      { onConflict: 'tenant_id' },
     );
 }
 
-async function gmailClient(): Promise<gmail_v1.Gmail> {
-  const auth = await loadStoredTokens();
+async function getGmailClientForTenant(tenantId: string): Promise<gmail_v1.Gmail> {
+  const auth = await loadStoredTokensForTenant(tenantId);
   if (!auth) throw new Error('Gmail not connected. Visit /oauth/start to authorize.');
   return google.gmail({ version: 'v1', auth });
 }
@@ -147,8 +157,8 @@ function headersToMap(
   return map;
 }
 
-export async function listUnreadInbox(maxResults = 25): Promise<string[]> {
-  const gmail = await gmailClient();
+export async function listUnreadInbox(tenantId: string, maxResults = 25): Promise<string[]> {
+  const gmail = await getGmailClientForTenant(tenantId);
   const res = await gmail.users.messages.list({
     userId: 'me',
     q: 'in:inbox is:unread -category:promotions -category:social',
@@ -159,8 +169,8 @@ export async function listUnreadInbox(maxResults = 25): Promise<string[]> {
     .filter((id): id is string => typeof id === 'string' && id.length > 0);
 }
 
-export async function fetchMessage(messageId: string): Promise<IncomingEmail> {
-  const gmail = await gmailClient();
+export async function fetchMessage(tenantId: string, messageId: string): Promise<IncomingEmail> {
+  const gmail = await getGmailClientForTenant(tenantId);
   const res = await gmail.users.messages.get({ userId: 'me', id: messageId, format: 'full' });
   const m = res.data;
   if (!m.id || !m.threadId) {
@@ -187,8 +197,11 @@ export async function fetchMessage(messageId: string): Promise<IncomingEmail> {
   };
 }
 
-export async function fetchThreadMessages(threadId: string): Promise<ThreadMessage[]> {
-  const gmail = await gmailClient();
+export async function fetchThreadMessages(
+  tenantId: string,
+  threadId: string,
+): Promise<ThreadMessage[]> {
+  const gmail = await getGmailClientForTenant(tenantId);
   const res = await gmail.users.threads.get({
     userId: 'me',
     id: threadId,
@@ -203,8 +216,8 @@ export async function fetchThreadMessages(threadId: string): Promise<ThreadMessa
     }));
 }
 
-export async function markRead(messageId: string): Promise<void> {
-  const gmail = await gmailClient();
+export async function markRead(tenantId: string, messageId: string): Promise<void> {
+  const gmail = await getGmailClientForTenant(tenantId);
   await gmail.users.messages.modify({
     userId: 'me',
     id: messageId,
@@ -212,8 +225,12 @@ export async function markRead(messageId: string): Promise<void> {
   });
 }
 
-export async function applyLabel(messageId: string, labelName: string): Promise<void> {
-  const gmail = await gmailClient();
+export async function applyLabel(
+  tenantId: string,
+  messageId: string,
+  labelName: string,
+): Promise<void> {
+  const gmail = await getGmailClientForTenant(tenantId);
   const labels = await gmail.users.labels.list({ userId: 'me' });
   let labelId = labels.data.labels?.find((l) => l.name === labelName)?.id ?? undefined;
   if (!labelId) {
@@ -238,14 +255,14 @@ export async function applyLabel(messageId: string, labelName: string): Promise<
 export interface SendReplyInput {
   threadId: string;
   inReplyToMessageId: string;
-  originalMessageIdHeader?: string; // RFC 5322 Message-ID from the original email's headers
+  originalMessageIdHeader?: string;
   to: string;
   subject: string;
   bodyText: string;
 }
 
-export async function sendReply(input: SendReplyInput): Promise<string> {
-  const gmail = await gmailClient();
+export async function sendReply(tenantId: string, input: SendReplyInput): Promise<string> {
+  const gmail = await getGmailClientForTenant(tenantId);
   const rawMsgId = input.originalMessageIdHeader?.trim() ?? `<${input.inReplyToMessageId}>`;
   const msgIdRef = rawMsgId.startsWith('<') ? rawMsgId : `<${rawMsgId}>`;
   const headerLines = [

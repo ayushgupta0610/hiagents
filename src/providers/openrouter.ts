@@ -1,4 +1,5 @@
 import { env } from '../config.js';
+import { recordUsage } from '../tenant/usage.js';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -10,6 +11,13 @@ export interface ChatOptions {
   messages: ChatMessage[];
   temperature?: number;
   maxTokens?: number;
+  tenantId?: string;
+  kind?: 'chat' | 'classifier';
+}
+
+interface OpenRouterResponse {
+  choices: Array<{ message: { content: string } }>;
+  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
 }
 
 export async function chat(opts: ChatOptions): Promise<string> {
@@ -33,10 +41,19 @@ export async function chat(opts: ChatOptions): Promise<string> {
     const text = await res.text();
     throw new Error(`OpenRouter ${res.status}: ${text}`);
   }
-  const json = (await res.json()) as {
-    choices: Array<{ message: { content: string } }>;
-  };
+  const json = (await res.json()) as OpenRouterResponse;
   const content = json.choices?.[0]?.message?.content;
   if (!content) throw new Error('OpenRouter returned no content');
+
+  if (opts.tenantId) {
+    await recordUsage({
+      tenantId: opts.tenantId,
+      model: opts.model,
+      kind: opts.kind ?? 'chat',
+      promptTokens: json.usage?.prompt_tokens ?? 0,
+      completionTokens: json.usage?.completion_tokens ?? 0,
+    });
+  }
+
   return content;
 }

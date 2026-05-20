@@ -40,15 +40,20 @@ export async function classifyWith(
   return normalized === 'client_query' ? 'client_query' : 'other';
 }
 
-export async function classify(input: ClassifierInput): Promise<ClassifierVerdict> {
-  const { env } = await import('../config.js');
+export async function classify(
+  tenantId: string,
+  settings: import('../tenant/types.js').TenantSettings,
+  input: ClassifierInput,
+): Promise<ClassifierVerdict> {
   const { chat } = await import('../providers/openrouter.js');
-  const systemPrompt = env.CLASSIFIER_PROMPT?.trim() || DEFAULT_CLASSIFIER_PROMPT;
+  const systemPrompt = settings.classifier.prompt?.trim() || DEFAULT_CLASSIFIER_PROMPT;
   return classifyWith(async (userPrompt) => {
     return await chat({
-      model: env.CLASSIFIER_MODEL,
+      model: settings.classifier.model,
       temperature: 0,
       maxTokens: 5,
+      tenantId,
+      kind: 'classifier',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },

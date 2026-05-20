@@ -1,11 +1,9 @@
 import type { Request, Response, NextFunction } from 'express';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { env } from '../config.js';
+import { findTenantForEmail, touchMembership } from '../tenant/store.js';
 
 const COOKIE = 'inbox_ai_admin';
-
-// Special sentinel for password-based sessions (not a valid email)
-const PASSWORD_SESSION = '__password__';
 
 function sign(value: string): string {
   return createHmac('sha256', env.ADMIN_PASSWORD).update(value).digest('hex');
@@ -19,7 +17,8 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 interface Session {
-  email: string; // real email OR PASSWORD_SESSION
+  email: string;
+  tenantId: string | null;
   ts: number;
 }
 
@@ -33,22 +32,25 @@ function decode(b: string): string {
 function parseSession(value: string | undefined): Session | null {
   if (!value) return null;
   const parts = value.split('.');
-  if (parts.length !== 3) return null;
-  const [ts, emailB64, sig] = parts;
-  if (!ts || !emailB64 || !sig) return null;
-  const payload = `${ts}.${emailB64}`;
+  if (parts.length !== 4) return null;
+  const [ts, emailB64, tenantB64, sig] = parts;
+  if (!ts || !emailB64 || !tenantB64 || !sig) return null;
+  const payload = `${ts}.${emailB64}.${tenantB64}`;
   if (!safeEqual(sig, sign(payload))) return null;
   try {
-    return { email: decode(emailB64), ts: Number(ts) };
+    const email = decode(emailB64);
+    const decoded = decode(tenantB64);
+    return { email, tenantId: decoded === '' ? null : decoded, ts: Number(ts) };
   } catch {
     return null;
   }
 }
 
-function issueCookie(res: Response, email: string): void {
+function issueCookie(res: Response, email: string, tenantId: string | null): void {
   const ts = String(Date.now());
   const emailB64 = encode(email);
-  const payload = `${ts}.${emailB64}`;
+  const tenantB64 = encode(tenantId ?? '');
+  const payload = `${ts}.${emailB64}.${tenantB64}`;
   const sig = sign(payload);
   res.cookie(COOKIE, `${payload}.${sig}`, {
     httpOnly: true,
@@ -58,49 +60,48 @@ function issueCookie(res: Response, email: string): void {
   });
 }
 
-export function issueSessionForEmail(res: Response, email: string): void {
-  issueCookie(res, email.toLowerCase());
+export function issueSessionForEmail(res: Response, email: string, tenantId: string): void {
+  issueCookie(res, email.toLowerCase(), tenantId);
 }
 
 export function issueSessionForPassword(res: Response): void {
-  issueCookie(res, PASSWORD_SESSION);
-}
-
-// Kept for backwards-compat with any callers still using the old name
-export function issueSessionCookie(res: Response): void {
-  issueSessionForPassword(res);
+  issueCookie(res, '__password__', null);
 }
 
 export function clearSession(res: Response): void {
-  res.clearCookie(COOKIE, { httpOnly: true, sameSite: 'lax', secure: env.NODE_ENV === 'production' });
+  res.clearCookie(COOKIE, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: env.NODE_ENV === 'production',
+  });
 }
 
-export function adminEmails(): string[] {
-  if (!env.ADMIN_EMAILS) return [];
-  return env.ADMIN_EMAILS
-    .split(',')
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-export function isAdminEmail(email: string): boolean {
-  const list = adminEmails();
-  if (list.length === 0) return false;
-  return list.includes(email.toLowerCase());
-}
-
-export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+export async function requireAdmin(req: Request, res: Response, next: NextFunction): Promise<void> {
   const session = parseSession(req.cookies?.[COOKIE]);
-  const authorized =
-    session !== null &&
-    (session.email === PASSWORD_SESSION || isAdminEmail(session.email));
-  if (authorized) {
-    res.locals.adminEmail = session?.email === PASSWORD_SESSION ? null : session?.email;
+
+  if (session && session.email === '__password__') {
+    res.locals.adminEmail = null;
+    res.locals.tenantId = null;
+    res.locals.passwordSession = true;
     next();
     return;
   }
-  // API routes always return 401 JSON so client-side fetch() can detect and
-  // redirect to the login page. Page routes redirect to /admin/login directly.
+
+  if (session && session.email && session.tenantId) {
+    const found = await findTenantForEmail(session.email);
+    if (found && found.tenant.id === session.tenantId && !found.tenant.deletedAt) {
+      res.locals.adminEmail = session.email;
+      res.locals.tenantId = found.tenant.id;
+      res.locals.tenant = found.tenant;
+      res.locals.membershipId = found.membership.id;
+      touchMembership(found.membership.id).catch(() => {
+        /* non-critical */
+      });
+      next();
+      return;
+    }
+  }
+
   if (req.path.startsWith('/api/') || req.xhr) {
     res.status(401).json({ error: 'unauthorized', loginUrl: '/admin/login' });
   } else {
@@ -115,5 +116,16 @@ export function checkPassword(input: string): boolean {
 export function getSessionEmail(req: Request): string | null {
   const session = parseSession(req.cookies?.[COOKIE]);
   if (!session) return null;
-  return session.email === PASSWORD_SESSION ? null : session.email;
+  return session.email === '__password__' ? null : session.email;
+}
+
+export function adminEmails(): string[] {
+  // Backwards-compat shim: in SaaS mode this returns empty (whitelist comes from memberships).
+  // Kept so existing callers in oauth.ts compile until they're migrated.
+  return [];
+}
+
+export function isAdminEmail(_email: string): boolean {
+  // In SaaS mode, every Google-signed-in email is allowed (auto-provisioned tenant).
+  return true;
 }

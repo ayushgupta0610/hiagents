@@ -1,13 +1,14 @@
 import { db } from '../db/client.js';
 import { logger } from '../lib/logger.js';
-import { env } from '../config.js';
+import { assertEmailQuota, LimitExceededError } from '../tenant/limits.js';
+import type { Tenant } from '../tenant/store.js';
 import type { IncomingEmail, Classification, ReplyStatus } from '../types.js';
 import { isAutoOrBulk } from './loop-guard.js';
 import { loadBotSentIdsForThread, ownerHasReplied } from './thread-guard.js';
 import { classify } from './classifier.js';
 import { search } from '../kb/search.js';
 import { generateReply } from './generate.js';
-import { fetchThreadMessages, sendReply } from '../providers/gmail.js';
+import { fetchThreadMessages, sendReply, type SendReplyInput } from '../providers/gmail.js';
 
 export interface RunResult {
   classification: Classification;
@@ -15,37 +16,60 @@ export interface RunResult {
   replyReason?: string;
 }
 
-function isFromSelf(email: IncomingEmail): boolean {
-  const match = email.from.match(/<([^>]+)>/);
-  const sender = (match?.[1] ?? email.from).trim().toLowerCase();
-  return sender === env.GMAIL_ADDRESS.toLowerCase();
+export interface RunContext {
+  tenant: Tenant;
+  ownerEmail: string;
 }
 
-export async function runPipeline(email: IncomingEmail): Promise<RunResult> {
-  const supabase = db();
+function isFromSelf(email: IncomingEmail, ownerEmail: string): boolean {
+  const match = email.from.match(/<([^>]+)>/);
+  const sender = (match?.[1] ?? email.from).trim().toLowerCase();
+  return sender === ownerEmail.toLowerCase();
+}
 
-  // Idempotency: skip if we've already processed this message id
+export async function runPipeline(ctx: RunContext, email: IncomingEmail): Promise<RunResult> {
+  const supabase = db();
+  const settings = ctx.tenant.settings;
+  const tenantId = ctx.tenant.id;
+
   const { data: existing } = await supabase
     .from('messages')
     .select('id')
+    .eq('tenant_id', tenantId)
     .eq('gmail_message_id', email.gmailMessageId)
     .maybeSingle();
   if (existing) {
-    logger.info({ id: email.gmailMessageId }, 'already processed, skipping');
+    logger.info({ tenantId, id: email.gmailMessageId }, 'already processed');
     return { classification: 'other', replyStatus: 'none', replyReason: 'already-processed' };
   }
 
   const baseRow = {
+    tenant_id: tenantId,
     gmail_message_id: email.gmailMessageId,
     gmail_thread_id: email.gmailThreadId,
     received_at: email.receivedAt.toISOString(),
     from_address: email.from,
     subject: email.subject,
-    body_text: email.bodyText.slice(0, 50000),
+    body_text: email.bodyText.slice(0, 50_000),
   };
 
-  // Guard: self-sent
-  if (isFromSelf(email)) {
+  try {
+    await assertEmailQuota(tenantId, settings);
+  } catch (err) {
+    if (err instanceof LimitExceededError) {
+      logger.warn({ tenantId, code: err.code }, 'daily email cap reached');
+      await supabase.from('messages').insert({
+        ...baseRow,
+        classification: 'skipped_loop',
+        reply_status: 'skipped',
+        reply_reason: `daily-cap: ${err.message}`,
+      });
+      return { classification: 'skipped_loop', replyStatus: 'skipped', replyReason: 'daily-cap' };
+    }
+    throw err;
+  }
+
+  if (isFromSelf(email, ctx.ownerEmail)) {
     await supabase.from('messages').insert({
       ...baseRow,
       classification: 'skipped_self',
@@ -55,7 +79,6 @@ export async function runPipeline(email: IncomingEmail): Promise<RunResult> {
     return { classification: 'skipped_self', replyStatus: 'skipped' };
   }
 
-  // Guard: auto/bulk
   if (isAutoOrBulk(email.headers)) {
     await supabase.from('messages').insert({
       ...baseRow,
@@ -66,10 +89,9 @@ export async function runPipeline(email: IncomingEmail): Promise<RunResult> {
     return { classification: 'skipped_loop', replyStatus: 'skipped' };
   }
 
-  // Guard: owner already replied in this thread
-  const botSentIds = await loadBotSentIdsForThread(email.gmailThreadId);
-  const threadMessages = await fetchThreadMessages(email.gmailThreadId);
-  if (ownerHasReplied(threadMessages, env.GMAIL_ADDRESS, botSentIds)) {
+  const botSentIds = await loadBotSentIdsForThread(tenantId, email.gmailThreadId);
+  const threadMessages = await fetchThreadMessages(tenantId, email.gmailThreadId);
+  if (ownerHasReplied(threadMessages, ctx.ownerEmail, botSentIds)) {
     await supabase.from('messages').insert({
       ...baseRow,
       classification: 'skipped_thread',
@@ -80,8 +102,7 @@ export async function runPipeline(email: IncomingEmail): Promise<RunResult> {
   }
 
   try {
-    // Classify
-    const verdict = await classify({
+    const verdict = await classify(tenantId, settings, {
       from: email.from,
       subject: email.subject,
       bodyText: email.bodyText,
@@ -96,9 +117,8 @@ export async function runPipeline(email: IncomingEmail): Promise<RunResult> {
       return { classification: 'other', replyStatus: 'skipped' };
     }
 
-    // Retrieve
     const query = `${email.subject}\n\n${email.bodyText}`;
-    const chunks = await search(query);
+    const chunks = await search(tenantId, settings, query);
     const topSim = chunks[0]?.similarity ?? 0;
 
     if (chunks.length === 0) {
@@ -112,18 +132,31 @@ export async function runPipeline(email: IncomingEmail): Promise<RunResult> {
       return { classification: 'client_query', replyStatus: 'skipped', replyReason: 'no-kb-match' };
     }
 
-    // Generate
-    const replyText = await generateReply({ email, chunks });
+    const replyText = await generateReply({ tenantId, settings, email, chunks });
 
-    // Send via Gmail
-    const sentId = await sendReply({
+    if (!settings.polling.autoSend) {
+      await supabase.from('messages').insert({
+        ...baseRow,
+        classification: 'client_query',
+        retrieved_chunk_ids: chunks.map((c) => c.id),
+        top_similarity: topSim,
+        reply_text: replyText,
+        reply_status: 'drafted',
+        reply_reason: 'auto-send disabled',
+      });
+      logger.info({ tenantId, id: email.gmailMessageId }, 'reply drafted (autoSend off)');
+      return { classification: 'client_query', replyStatus: 'sent', replyReason: 'drafted' };
+    }
+
+    const sendInput: SendReplyInput = {
       threadId: email.gmailThreadId,
       inReplyToMessageId: email.gmailMessageId,
       originalMessageIdHeader: email.headers['message-id'],
       to: email.from,
       subject: email.subject.startsWith('Re:') ? email.subject : `Re: ${email.subject}`,
       bodyText: replyText,
-    });
+    };
+    const sentId = await sendReply(tenantId, sendInput);
 
     await supabase.from('messages').insert({
       ...baseRow,
@@ -136,7 +169,7 @@ export async function runPipeline(email: IncomingEmail): Promise<RunResult> {
       reply_gmail_message_id: sentId,
     });
 
-    logger.info({ id: email.gmailMessageId, topSim, chunks: chunks.length }, 'reply sent');
+    logger.info({ tenantId, id: email.gmailMessageId, topSim }, 'reply sent');
     return { classification: 'client_query', replyStatus: 'sent' };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
