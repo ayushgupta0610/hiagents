@@ -2,78 +2,478 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>inbox-ai admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>inbox-ai · admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
 <style>
-  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 900px; margin: 40px auto; padding: 0 20px; color: #222; }
-  h1 { margin-bottom: 4px; }
-  .sub { color: #666; margin-top: 0; }
-  section { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; }
-  table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
-  th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; vertical-align: top; }
-  .drop { border: 2px dashed #ccc; padding: 40px; text-align: center; border-radius: 8px; color: #888; transition: border-color 0.15s, color 0.15s; }
-  .drop.hover { border-color: #2a7; color: #2a7; }
-  .drop.uploading { border-color: #b88; color: #b88; }
-  button { padding: 6px 12px; cursor: pointer; }
-  button.del { color: #c33; background: #fff; border: 1px solid #ddd; border-radius: 4px; }
-  button.del:hover { background: #fde0e0; }
-  .pill { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
-  .pill-sent, .pill-ingested { background: #e0f5e0; color: #2a7; }
-  .pill-skipped, .pill-pending { background: #fff5cc; color: #875; }
-  .pill-failed { background: #fde0e0; color: #c33; }
-  .banner { padding: 12px 16px; border-radius: 6px; margin: 12px 0; font-size: 14px; display: none; }
-  .banner.show { display: block; }
-  .banner-error { background: #fde0e0; color: #802020; border: 1px solid #f5b5b5; }
-  .banner-info { background: #e0f0fd; color: #204060; border: 1px solid #b5d5f5; }
-  .banner-success { background: #e0f5e0; color: #2a7; border: 1px solid #b5e5b5; }
-  .banner .close { float: right; background: none; border: none; font-size: 18px; line-height: 14px; cursor: pointer; color: inherit; padding: 0; margin-left: 12px; }
-  small { color: #666; }
-  .empty { color: #999; font-style: italic; padding: 12px 8px; }
+  :root {
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --border-strong: #cbd5e1;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --text-subtle: #94a3b8;
+    --primary: #4f46e5;
+    --primary-hover: #4338ca;
+    --primary-soft: #eef2ff;
+    --success: #16a34a;
+    --success-soft: #dcfce7;
+    --warning: #ca8a04;
+    --warning-soft: #fef3c7;
+    --danger: #dc2626;
+    --danger-soft: #fee2e2;
+    --neutral-soft: #f1f5f9;
+    --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.04);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  /* ============ Top nav ============ */
+  .nav {
+    background: white;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .nav-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text);
+    text-decoration: none;
+  }
+  .brand-mark {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    display: grid; place-items: center;
+    color: white;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: -0.4px;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+  }
+  .brand-name { font-size: 15px; font-weight: 600; letter-spacing: -0.2px; }
+  .nav-right {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .admin-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px 6px 6px;
+    background: var(--neutral-soft);
+    border-radius: 20px;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .admin-chip .avatar {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #94a3b8, #475569);
+    color: white;
+    font-weight: 600;
+    font-size: 11px;
+    display: grid; place-items: center;
+    text-transform: uppercase;
+  }
+  .logout {
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 13px;
+    padding: 6px 10px;
+    border-radius: 6px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .logout:hover { background: var(--neutral-soft); color: var(--text); }
+  /* ============ Layout ============ */
+  main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 32px 24px 80px;
+  }
+  .page-header {
+    margin-bottom: 24px;
+  }
+  .page-header h1 {
+    margin: 0 0 6px;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+  }
+  .page-header p { margin: 0; color: var(--text-muted); }
+  /* ============ KPI cards ============ */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  @media (max-width: 800px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 480px) {
+    .kpi-row { grid-template-columns: 1fr; }
+  }
+  .kpi {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow);
+  }
+  .kpi-label {
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+  .kpi-value {
+    font-size: 28px;
+    font-weight: 600;
+    letter-spacing: -0.6px;
+    color: var(--text);
+  }
+  .kpi-sub {
+    color: var(--text-subtle);
+    font-size: 12px;
+    margin-top: 4px;
+  }
+  /* ============ Section cards ============ */
+  .section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 24px;
+    overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .section-header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .section-header h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.2px;
+  }
+  .section-header .sub {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin: 4px 0 0;
+  }
+  .section-body { padding: 20px 24px 24px; }
+  /* ============ Status pills ============ */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+  .pill::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+  .pill-success, .pill-sent, .pill-ingested, .pill-connected { background: var(--success-soft); color: var(--success); }
+  .pill-warning, .pill-skipped, .pill-pending { background: var(--warning-soft); color: var(--warning); }
+  .pill-error, .pill-failed, .pill-disconnected { background: var(--danger-soft); color: var(--danger); }
+  .pill-neutral { background: var(--neutral-soft); color: var(--text-muted); }
+  /* ============ Drop zone ============ */
+  .drop {
+    border: 2px dashed var(--border-strong);
+    background: #fafbfc;
+    padding: 36px 24px;
+    text-align: center;
+    border-radius: 10px;
+    color: var(--text-muted);
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    cursor: pointer;
+  }
+  .drop:hover { background: #f8fafc; border-color: #94a3b8; }
+  .drop.hover { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
+  .drop.uploading { background: var(--warning-soft); border-color: var(--warning); color: var(--warning); }
+  .drop-icon { font-size: 28px; line-height: 1; margin-bottom: 8px; }
+  .drop-text { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .drop-hint { font-size: 12px; color: var(--text-muted); }
+  .drop input[type="file"] { display: none; }
+  /* ============ Upload status list ============ */
   .upload-list { margin-top: 12px; }
-  .upload-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
-  .upload-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .upload-row .state { font-size: 12px; }
-  .upload-row.success { color: #2a7; }
-  .upload-row.error { color: #c33; }
-  .upload-row.error .err { font-size: 12px; opacity: 0.8; }
+  .upload-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: var(--neutral-soft);
+    border-radius: 8px;
+    margin-top: 6px;
+    font-size: 13px;
+  }
+  .upload-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+  .upload-row.success { background: var(--success-soft); color: var(--success); }
+  .upload-row.error { background: var(--danger-soft); color: var(--danger); }
+  /* ============ Tables ============ */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+    font-size: 13px;
+  }
+  thead th {
+    text-align: left;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+    background: #fafbfc;
+  }
+  tbody td {
+    padding: 14px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover { background: #fafbfc; }
+  .table-wrap {
+    margin: 0 -24px;
+    border-top: 1px solid var(--border);
+  }
+  .table-wrap thead th:first-child { padding-left: 24px; }
+  .table-wrap thead th:last-child { padding-right: 24px; }
+  .table-wrap tbody td:first-child { padding-left: 24px; }
+  .table-wrap tbody td:last-child { padding-right: 24px; }
+  /* ============ Buttons ============ */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-strong);
+    background: white;
+    color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn:hover { background: var(--neutral-soft); }
+  .btn-danger { color: var(--danger); border-color: var(--danger-soft); }
+  .btn-danger:hover { background: var(--danger-soft); }
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+  .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+  /* ============ Empty + loading states ============ */
+  .empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  .empty .icon { font-size: 24px; opacity: 0.5; margin-bottom: 8px; }
+  .empty-title { color: var(--text); font-weight: 500; margin-bottom: 4px; }
+  .skeleton { color: var(--text-subtle); font-size: 13px; }
+  small { color: var(--text-muted); }
+  code { font-family: 'SF Mono', 'Monaco', monospace; font-size: 12px; background: var(--neutral-soft); padding: 1px 5px; border-radius: 3px; }
+  /* ============ Connection card content ============ */
+  .conn-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .conn-email { font-weight: 500; }
+  .conn-meta { color: var(--text-muted); font-size: 12px; }
+  /* ============ Banner ============ */
+  .banner {
+    padding: 12px 16px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    display: none;
+    border: 1px solid;
+  }
+  .banner.show { display: flex; align-items: flex-start; gap: 12px; }
+  .banner-error { background: var(--danger-soft); border-color: #fca5a5; color: #7f1d1d; }
+  .banner .close {
+    margin-left: auto;
+    background: none; border: none;
+    color: inherit; opacity: 0.6;
+    font-size: 16px; line-height: 1;
+    cursor: pointer;
+    padding: 0;
+  }
+  .banner .close:hover { opacity: 1; }
 </style>
 </head>
 <body>
-<h1>inbox-ai</h1>
-<p class="sub">Admin dashboard</p>
 
-<div id="global-error" class="banner banner-error"><button class="close" onclick="this.parentElement.classList.remove('show')">×</button><span></span></div>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="/admin">
+      <div class="brand-mark">ia</div>
+      <div class="brand-name">inbox-ai</div>
+    </a>
+    <div class="nav-right">
+      <div class="admin-chip" id="admin-chip" title="Signed in">
+        <div class="avatar" id="admin-avatar">·</div>
+        <span id="admin-email">loading…</span>
+      </div>
+      <a class="logout" href="/admin/auth/logout">Sign out</a>
+    </div>
+  </div>
+</nav>
 
-<section>
-  <h2>Gmail connection</h2>
-  <div id="status">Loading…</div>
-  <p style="margin-top:12px"><a href="/oauth/start">Connect / reconnect Gmail</a></p>
-</section>
+<main>
+  <div class="page-header">
+    <h1>Dashboard</h1>
+    <p>Knowledge base, Gmail connection, and recent activity at a glance.</p>
+  </div>
 
-<section>
-  <h2>Knowledge base</h2>
-  <div id="drop" class="drop">Drag a PDF here, or <input type="file" id="file" accept="application/pdf" multiple></div>
-  <div id="upload-list" class="upload-list"></div>
-  <table id="docs"><thead><tr><th>File</th><th>Status</th><th>Chunks</th><th>Uploaded</th><th></th></tr></thead><tbody></tbody></table>
-</section>
+  <div id="global-error" class="banner banner-error">
+    <span id="global-error-msg"></span>
+    <button class="close" onclick="this.parentElement.classList.remove('show')">×</button>
+  </div>
 
-<section>
-  <h2>Recent activity</h2>
-  <p class="sub" style="font-size:13px">Auto-refreshes every 30s. Shows the latest 100 emails processed by the bot.</p>
-  <table id="msgs"><thead><tr><th>Received</th><th>From</th><th>Subject</th><th>Class</th><th>Reply</th></tr></thead><tbody></tbody></table>
-</section>
+  <!-- KPI row -->
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Documents</div>
+      <div class="kpi-value" id="kpi-documents">—</div>
+      <div class="kpi-sub" id="kpi-documents-sub">ingested PDFs</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Chunks</div>
+      <div class="kpi-value" id="kpi-chunks">—</div>
+      <div class="kpi-sub">searchable passages</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Replies sent</div>
+      <div class="kpi-value" id="kpi-sent">—</div>
+      <div class="kpi-sub" id="kpi-sent-sub">last 7 days</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Last email</div>
+      <div class="kpi-value" id="kpi-last" style="font-size: 18px">—</div>
+      <div class="kpi-sub" id="kpi-last-sub">received by the bot</div>
+    </div>
+  </div>
+
+  <!-- Gmail connection -->
+  <section class="section">
+    <div class="section-header">
+      <div>
+        <h2>Gmail connection</h2>
+        <p class="sub">The mailbox the bot polls and replies from.</p>
+      </div>
+      <a class="btn" href="/oauth/start" id="connect-btn">Connect / reconnect</a>
+    </div>
+    <div class="section-body">
+      <div id="gmail-status" class="conn-row">
+        <span class="skeleton">Loading…</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Knowledge base -->
+  <section class="section">
+    <div class="section-header">
+      <div>
+        <h2>Knowledge base</h2>
+        <p class="sub">PDFs the bot draws answers from. Drop new files to add to the KB.</p>
+      </div>
+    </div>
+    <div class="section-body">
+      <label for="file" class="drop" id="drop">
+        <div class="drop-icon">📄</div>
+        <div class="drop-text">Drop PDFs here, or click to choose files</div>
+        <div class="drop-hint">Max 25 MB per file</div>
+        <input type="file" id="file" accept="application/pdf" multiple>
+      </label>
+      <div id="upload-list" class="upload-list"></div>
+    </div>
+    <div class="table-wrap">
+      <table id="docs">
+        <thead><tr>
+          <th>File</th><th>Status</th><th>Chunks</th><th>Uploaded</th><th></th>
+        </tr></thead>
+        <tbody><tr><td colspan="5" class="empty"><div class="skeleton">Loading documents…</div></td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Recent activity -->
+  <section class="section">
+    <div class="section-header">
+      <div>
+        <h2>Recent activity</h2>
+        <p class="sub">Latest 100 emails processed by the bot. Auto-refreshes every 30s.</p>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="msgs">
+        <thead><tr>
+          <th>Received</th><th>From</th><th>Subject</th><th>Class</th><th>Reply</th>
+        </tr></thead>
+        <tbody><tr><td colspan="5" class="empty"><div class="skeleton">Loading activity…</div></td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</main>
 
 <script>
-// Defensive: unregister any service worker left over from another app on localhost.
-// inbox-ai never registers a SW, so anything alive here was registered by a
-// previous project on this origin and will silently intercept our fetches.
+// Defensive: unregister any service worker left over from another app on this origin
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((regs) => {
     if (regs.length > 0) {
-      console.warn('[inbox-ai] Unregistering', regs.length, 'leftover service worker(s) from this origin');
+      console.warn('[inbox-ai] Unregistering', regs.length, 'leftover service worker(s)');
       regs.forEach((r) => r.unregister());
     }
   }).catch(() => {});
-  // Also clear any caches the SW left behind
   if ('caches' in window) {
     caches.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => {});
   }
@@ -84,9 +484,22 @@ function escapeHtml(s) {
 }
 
 function showGlobalError(msg) {
-  const el = document.getElementById('global-error');
-  el.querySelector('span').textContent = msg;
-  el.classList.add('show');
+  document.getElementById('global-error-msg').textContent = msg;
+  document.getElementById('global-error').classList.add('show');
+}
+
+function relativeTime(iso) {
+  if (!iso) return '—';
+  const ms = Date.now() - new Date(iso).getTime();
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return 'just now';
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 async function safeFetch(url, opts) {
@@ -98,7 +511,6 @@ async function safeFetch(url, opts) {
     throw new Error(`Network error talking to ${url}: ${err.message || err}`);
   }
   if (res.status === 401) {
-    // Session expired or never authed — bounce to login.
     window.location.href = '/admin/login';
     throw new Error('Session expired — redirecting to login');
   }
@@ -110,17 +522,50 @@ async function safeFetch(url, opts) {
   return res.json();
 }
 
+// ============ Loaders ============
 async function loadStatus() {
-  const el = document.getElementById('status');
   try {
     const data = await safeFetch('/admin/api/status');
-    if (data.gmail) {
-      el.innerHTML = `<span class="pill pill-ingested">Connected</span> ${escapeHtml(data.gmail.email)} <small>(updated ${new Date(data.gmail.updated_at).toLocaleString()})</small>`;
+    // Admin chip
+    const adminEmail = data.admin?.email;
+    const chip = document.getElementById('admin-email');
+    const avatar = document.getElementById('admin-avatar');
+    if (adminEmail) {
+      chip.textContent = adminEmail;
+      avatar.textContent = adminEmail.charAt(0);
     } else {
-      el.innerHTML = `<span class="pill pill-failed">Not connected</span> Click the link below to authorize Gmail. The bot will not poll or reply until this is set up.`;
+      chip.textContent = 'admin (password)';
+      avatar.textContent = 'A';
+    }
+    // Gmail status
+    const el = document.getElementById('gmail-status');
+    if (data.gmail) {
+      el.innerHTML = `
+        <span class="pill pill-connected">Connected</span>
+        <span class="conn-email">${escapeHtml(data.gmail.email)}</span>
+        <span class="conn-meta">Updated ${relativeTime(data.gmail.updated_at)}</span>
+      `;
+    } else {
+      el.innerHTML = `
+        <span class="pill pill-disconnected">Not connected</span>
+        <span class="conn-meta">The bot will not poll or reply until Gmail is connected.</span>
+      `;
     }
   } catch (err) {
-    el.innerHTML = `<span class="pill pill-failed">Error</span> ${escapeHtml(err.message)}`;
+    document.getElementById('gmail-status').innerHTML = `<span class="pill pill-failed">Error</span> <span class="conn-meta">${escapeHtml(err.message)}</span>`;
+  }
+}
+
+async function loadStats() {
+  try {
+    const data = await safeFetch('/admin/api/stats');
+    document.getElementById('kpi-documents').textContent = data.documents;
+    document.getElementById('kpi-chunks').textContent = data.chunks.toLocaleString();
+    document.getElementById('kpi-sent').textContent = data.repliesSent7d;
+    document.getElementById('kpi-sent-sub').textContent = `last 7 days · ${data.repliesSkipped7d} skipped`;
+    document.getElementById('kpi-last').textContent = data.lastEmailAt ? relativeTime(data.lastEmailAt) : 'No emails yet';
+  } catch (err) {
+    showGlobalError('Failed to load stats: ' + err.message);
   }
 }
 
@@ -128,27 +573,30 @@ async function loadDocs() {
   const tbody = document.querySelector('#docs tbody');
   try {
     const docs = await safeFetch('/admin/api/documents');
-    tbody.innerHTML = '';
     if (docs.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" class="empty">No documents yet — drop a PDF above to add to the knowledge base.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="icon">📚</div><div class="empty-title">No documents yet</div>Drop a PDF above to add it to the knowledge base.</div></td></tr>`;
       return false;
     }
     let anyPending = false;
+    tbody.innerHTML = '';
     for (const d of docs) {
       if (d.status === 'pending') anyPending = true;
-      const statusHtml = `<span class="pill pill-${d.status}">${d.status}</span>` + (d.error ? `<br><small>${escapeHtml(d.error)}</small>` : '');
+      const statusHtml = `<span class="pill pill-${d.status}">${d.status}</span>` +
+        (d.error ? `<div style="margin-top:6px"><small>${escapeHtml(d.error)}</small></div>` : '');
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${escapeHtml(d.filename)}</td>
+      tr.innerHTML = `
+        <td style="font-weight: 500">${escapeHtml(d.filename)}</td>
         <td>${statusHtml}</td>
         <td>${d.chunk_count ?? '—'}</td>
-        <td><small>${new Date(d.uploaded_at).toLocaleString()}</small></td>
-        <td><button data-id="${d.id}" class="del">Delete</button></td>`;
+        <td><small>${relativeTime(d.uploaded_at)}</small></td>
+        <td><button data-id="${d.id}" class="btn btn-danger" data-del>Delete</button></td>
+      `;
       tbody.appendChild(tr);
     }
-    tbody.querySelectorAll('button.del').forEach((b) => b.addEventListener('click', () => deleteDoc(b.dataset.id)));
+    tbody.querySelectorAll('button[data-del]').forEach((b) => b.addEventListener('click', () => deleteDoc(b.dataset.id)));
     return anyPending;
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5"><span class="pill pill-failed">Error</span> ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><span class="pill pill-failed">Error</span> ${escapeHtml(err.message)}</div></td></tr>`;
     return false;
   }
 }
@@ -158,6 +606,7 @@ async function deleteDoc(id) {
   try {
     await safeFetch('/admin/api/documents/' + id, { method: 'DELETE' });
     loadDocs();
+    loadStats();
   } catch (err) {
     showGlobalError('Failed to delete document: ' + err.message);
   }
@@ -167,33 +616,38 @@ async function loadMsgs() {
   const tbody = document.querySelector('#msgs tbody');
   try {
     const msgs = await safeFetch('/admin/api/messages');
-    tbody.innerHTML = '';
     if (msgs.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5" class="empty">No emails processed yet. The bot polls Gmail every ${30} seconds (locally) — once you connect Gmail and an email arrives, you'll see it here.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="icon">📬</div><div class="empty-title">No emails processed yet</div>The bot polls Gmail every 30 seconds. Once mail arrives, you'll see it here.</div></td></tr>`;
       return;
     }
+    tbody.innerHTML = '';
     for (const m of msgs) {
       const pillClass = m.reply_status === 'sent' ? 'pill-sent' : m.reply_status === 'failed' ? 'pill-failed' : 'pill-skipped';
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td><small>${new Date(m.received_at).toLocaleString()}</small></td>
+      tr.innerHTML = `
+        <td><small>${new Date(m.received_at).toLocaleString()}</small></td>
         <td>${escapeHtml(m.from_address)}</td>
         <td>${escapeHtml(m.subject || '')}</td>
-        <td>${m.classification || ''}</td>
-        <td><span class="pill ${pillClass}">${m.reply_status || ''}</span>${m.reply_reason ? `<br><small>${escapeHtml(m.reply_reason)}</small>` : ''}</td>`;
+        <td><span class="pill pill-neutral">${m.classification || ''}</span></td>
+        <td>
+          <span class="pill ${pillClass}">${m.reply_status || ''}</span>
+          ${m.reply_reason ? `<div style="margin-top:4px"><small>${escapeHtml(m.reply_reason)}</small></div>` : ''}
+        </td>
+      `;
       tbody.appendChild(tr);
     }
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5"><span class="pill pill-failed">Error</span> ${escapeHtml(err.message)}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><span class="pill pill-failed">Error</span> ${escapeHtml(err.message)}</div></td></tr>`;
   }
 }
 
+// ============ Upload ============
 const drop = document.getElementById('drop');
 const fileInput = document.getElementById('file');
 const uploadList = document.getElementById('upload-list');
 
 ['dragover', 'dragenter'].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.add('hover'); }));
 ['dragleave', 'drop'].forEach((e) => drop.addEventListener(e, () => drop.classList.remove('hover')));
-
 drop.addEventListener('drop', async (ev) => {
   ev.preventDefault();
   await uploadAll(Array.from(ev.dataTransfer.files));
@@ -211,6 +665,7 @@ async function uploadAll(files) {
   } finally {
     drop.classList.remove('uploading');
     loadDocs();
+    loadStats();
   }
 }
 
@@ -222,12 +677,12 @@ async function uploadFile(file) {
 
   if (!file.name.toLowerCase().endsWith('.pdf')) {
     row.classList.add('error');
-    row.querySelector('.state').innerHTML = `<span class="err">not a PDF — skipped</span>`;
+    row.querySelector('.state').textContent = 'not a PDF — skipped';
     return;
   }
   if (file.size > 25 * 1024 * 1024) {
     row.classList.add('error');
-    row.querySelector('.state').innerHTML = `<span class="err">file too large (${(file.size / 1024 / 1024).toFixed(1)} MB > 25 MB limit)</span>`;
+    row.querySelector('.state').textContent = `too large (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
     return;
   }
 
@@ -236,29 +691,32 @@ async function uploadFile(file) {
   try {
     const result = await safeFetch('/admin/api/documents', { method: 'POST', body: fd });
     row.classList.add('success');
-    row.querySelector('.state').textContent = `ingested — ${result.chunkCount} chunks`;
+    row.querySelector('.state').textContent = `ingested · ${result.chunkCount} chunks`;
   } catch (err) {
     row.classList.add('error');
-    row.querySelector('.state').innerHTML = `<span class="err">${escapeHtml(err.message)}</span>`;
+    row.querySelector('.state').textContent = err.message;
   }
 }
 
+// ============ Polling ============
 let pollHandle = null;
 async function refreshDocs() {
   const anyPending = await loadDocs();
   if (anyPending && !pollHandle) {
     pollHandle = setInterval(async () => {
       const stillPending = await loadDocs();
-      if (!stillPending) { clearInterval(pollHandle); pollHandle = null; }
+      if (!stillPending) { clearInterval(pollHandle); pollHandle = null; loadStats(); }
     }, 3000);
   }
 }
 
 loadStatus();
+loadStats();
 refreshDocs();
 loadMsgs();
 setInterval(loadMsgs, 30000);
 setInterval(loadStatus, 60000);
+setInterval(loadStats, 60000);
 </script>
 </body>
 </html>

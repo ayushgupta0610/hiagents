@@ -4,6 +4,9 @@ import { env } from '../config.js';
 
 const COOKIE = 'inbox_ai_admin';
 
+// Special sentinel for password-based sessions (not a valid email)
+const PASSWORD_SESSION = '__password__';
+
 function sign(value: string): string {
   return createHmac('sha256', env.ADMIN_PASSWORD).update(value).digest('hex');
 }
@@ -15,10 +18,39 @@ function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(ab, bb);
 }
 
-export function issueSessionCookie(res: Response): void {
+interface Session {
+  email: string; // real email OR PASSWORD_SESSION
+  ts: number;
+}
+
+function encode(s: string): string {
+  return Buffer.from(s, 'utf-8').toString('base64url');
+}
+function decode(b: string): string {
+  return Buffer.from(b, 'base64url').toString('utf-8');
+}
+
+function parseSession(value: string | undefined): Session | null {
+  if (!value) return null;
+  const parts = value.split('.');
+  if (parts.length !== 3) return null;
+  const [ts, emailB64, sig] = parts;
+  if (!ts || !emailB64 || !sig) return null;
+  const payload = `${ts}.${emailB64}`;
+  if (!safeEqual(sig, sign(payload))) return null;
+  try {
+    return { email: decode(emailB64), ts: Number(ts) };
+  } catch {
+    return null;
+  }
+}
+
+function issueCookie(res: Response, email: string): void {
   const ts = String(Date.now());
-  const value = `${ts}.${sign(ts)}`;
-  res.cookie(COOKIE, value, {
+  const emailB64 = encode(email);
+  const payload = `${ts}.${emailB64}`;
+  const sig = sign(payload);
+  res.cookie(COOKIE, `${payload}.${sig}`, {
     httpOnly: true,
     sameSite: 'lax',
     secure: env.NODE_ENV === 'production',
@@ -26,18 +58,44 @@ export function issueSessionCookie(res: Response): void {
   });
 }
 
-function isValidCookie(value: string | undefined): boolean {
-  if (!value) return false;
-  const parts = value.split('.');
-  if (parts.length !== 2) return false;
-  const ts = parts[0];
-  const sig = parts[1];
-  if (!ts || !sig) return false;
-  return safeEqual(sig, sign(ts));
+export function issueSessionForEmail(res: Response, email: string): void {
+  issueCookie(res, email.toLowerCase());
+}
+
+export function issueSessionForPassword(res: Response): void {
+  issueCookie(res, PASSWORD_SESSION);
+}
+
+// Kept for backwards-compat with any callers still using the old name
+export function issueSessionCookie(res: Response): void {
+  issueSessionForPassword(res);
+}
+
+export function clearSession(res: Response): void {
+  res.clearCookie(COOKIE, { httpOnly: true, sameSite: 'lax', secure: env.NODE_ENV === 'production' });
+}
+
+export function adminEmails(): string[] {
+  if (!env.ADMIN_EMAILS) return [];
+  return env.ADMIN_EMAILS
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+export function isAdminEmail(email: string): boolean {
+  const list = adminEmails();
+  if (list.length === 0) return false;
+  return list.includes(email.toLowerCase());
 }
 
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  if (isValidCookie(req.cookies?.[COOKIE])) {
+  const session = parseSession(req.cookies?.[COOKIE]);
+  const authorized =
+    session !== null &&
+    (session.email === PASSWORD_SESSION || isAdminEmail(session.email));
+  if (authorized) {
+    res.locals.adminEmail = session?.email === PASSWORD_SESSION ? null : session?.email;
     next();
     return;
   }
@@ -52,4 +110,10 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 
 export function checkPassword(input: string): boolean {
   return safeEqual(input, env.ADMIN_PASSWORD);
+}
+
+export function getSessionEmail(req: Request): string | null {
+  const session = parseSession(req.cookies?.[COOKIE]);
+  if (!session) return null;
+  return session.email === PASSWORD_SESSION ? null : session.email;
 }

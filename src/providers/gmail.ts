@@ -7,12 +7,21 @@ import { logger } from '../lib/logger.js';
 import type { IncomingEmail } from '../types.js';
 import type { ThreadMessage } from '../pipeline/thread-guard.js';
 
-export const SCOPES = [
+export const MAILBOX_SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.send',
   'https://www.googleapis.com/auth/gmail.modify',
   'https://www.googleapis.com/auth/userinfo.email',
 ];
+
+export const SIGNIN_SCOPES = [
+  'openid',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
+];
+
+// Backwards-compat alias
+export const SCOPES = MAILBOX_SCOPES;
 
 export function getOAuthClient(): OAuth2Client {
   return new google.auth.OAuth2(
@@ -20,6 +29,26 @@ export function getOAuthClient(): OAuth2Client {
     env.GOOGLE_CLIENT_SECRET,
     env.GOOGLE_REDIRECT_URI,
   );
+}
+
+export function buildMailboxAuthUrl(): string {
+  const client = getOAuthClient();
+  return client.generateAuthUrl({
+    access_type: 'offline',
+    prompt: 'consent',
+    scope: MAILBOX_SCOPES,
+    state: 'mailbox',
+  });
+}
+
+export function buildSigninAuthUrl(): string {
+  const client = getOAuthClient();
+  return client.generateAuthUrl({
+    access_type: 'online',
+    prompt: 'select_account',
+    scope: SIGNIN_SCOPES,
+    state: 'login',
+  });
 }
 
 export async function loadStoredTokens(): Promise<OAuth2Client | null> {

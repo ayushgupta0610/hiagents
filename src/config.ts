@@ -29,6 +29,7 @@ const envSchema = z.object({
 
   // Admin
   ADMIN_PASSWORD: z.string().min(8),
+  ADMIN_EMAILS: z.string().optional(), // comma-separated Gmail addresses allowed to sign in via Google OAuth
   BASE_URL: z.url(),
 
   // Tuning
