@@ -8,6 +8,22 @@
 - Docker + Docker Compose installed on the VPS.
 - A Google Cloud OAuth client (see [GMAIL-OAUTH-SETUP.md](GMAIL-OAUTH-SETUP.md)).
 
+## Recommended hosting pattern (multi-client deployments)
+
+If you're hosting deployments for multiple clients, host each on a subdomain of **your** domain (not the client's), e.g.:
+
+- `bot-acme.aiagencycorp.com` → Acme's deployment
+- `bot-foo.aiagencycorp.com` → Foo's deployment
+
+This means YOU add the DNS A record (zero friction for the client) and you control the SSL termination. The client only needs to (a) click "Connect Gmail" in the admin UI and (b) drop their PDFs in. No DNS, no infrastructure on their side.
+
+Per new client at your end:
+1. Add the DNS A record under your domain
+2. Add the new callback URL to your OAuth app's "Authorized redirect URIs"
+3. Add the client's Gmail to the OAuth "Test users" list
+4. Provision a VPS (or new directory on a shared VPS), copy `.env.example` → `.env`, fill in
+5. `docker compose up -d --build`
+
 ## One-time VPS prep
 
 ```bash

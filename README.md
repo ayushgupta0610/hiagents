@@ -18,7 +18,7 @@ Every 60 seconds the server polls Gmail for unread inbox mail. For each message:
 2. **Thread guard** — skip if the owner has manually replied in this thread already.
 3. **Classifier** — a cheap LLM (`gpt-4o-mini`) labels the email as a client query or not.
 4. **Retrieve** — embed the email, pull top-k chunks from `kb_chunks` via pgvector.
-5. **Generate** — Claude Sonnet drafts a reply grounded in the retrieved chunks.
+5. **Generate** — DeepSeek V4 Flash (default; configurable via `REPLY_MODEL`) drafts a reply grounded in the retrieved chunks.
 6. **Send** — Gmail API sends the reply in-thread.
 7. **Label + audit** — apply `inbox-ai/replied` label; log the full decision trail to `messages`.
 

@@ -34,7 +34,7 @@ You set up the OAuth app **once** in your own Google Cloud account. All client d
 ## 4. Per-client OAuth flow
 
 1. Add the client's Gmail to "Test users" in your consent screen (until you submit for verification).
-2. Add their `https://bot.<clientdomain>.com/oauth/callback` to "Authorized redirect URIs".
+2. Add `https://bot-<clientname>.<yourdomain>.com/oauth/callback` to "Authorized redirect URIs" (use a subdomain of YOUR domain so the client doesn't have to set up DNS — see DEPLOY.md's "Recommended hosting pattern").
 3. After deploying their stack, have them visit `https://bot.<clientdomain>.com/admin`, log in, and click "Connect Gmail".
 4. They'll see a Google warning ("Google hasn't verified this app") because the app is unverified — click **Advanced → Go to inbox-ai (unsafe)**. This is normal for unverified internal apps.
 5. They grant the scopes. Refresh token is stored in Supabase `oauth_tokens` table.

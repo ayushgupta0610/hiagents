@@ -1,10 +1,11 @@
-import OpenAI from 'openai';
 import { env } from '../config.js';
 
-const client = new OpenAI({ apiKey: env.OPENAI_API_KEY });
-
-const MODEL = 'text-embedding-3-small';
+const MODEL = 'openai/text-embedding-3-small';
 const DIMENSIONS = 1536;
+
+interface EmbeddingResponse {
+  data: Array<{ embedding: number[] }>;
+}
 
 export async function embed(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
@@ -15,11 +16,22 @@ export async function embed(texts: string[]): Promise<number[][]> {
   }
   const all: number[][] = [];
   for (const batch of batches) {
-    const res = await client.embeddings.create({
-      model: MODEL,
-      input: batch,
+    const res = await fetch('https://openrouter.ai/api/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
+        'HTTP-Referer': env.BASE_URL,
+        'X-Title': 'inbox-ai',
+      },
+      body: JSON.stringify({ model: MODEL, input: batch }),
     });
-    for (const row of res.data) {
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`OpenRouter embeddings ${res.status}: ${text}`);
+    }
+    const json = (await res.json()) as EmbeddingResponse;
+    for (const row of json.data) {
       if (row.embedding.length !== DIMENSIONS) {
         throw new Error(`Unexpected embedding dim: ${row.embedding.length}`);
       }

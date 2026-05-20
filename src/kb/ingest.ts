@@ -2,7 +2,7 @@ import { db } from '../db/client.js';
 import { logger } from '../lib/logger.js';
 import { extractPdf } from './pdf-extract.js';
 import { chunkText } from './chunk.js';
-import { embed } from '../providers/openai-embeddings.js';
+import { embed } from '../providers/embeddings.js';
 
 const CHUNK_SIZE = 1200;
 const CHUNK_OVERLAP = 150;

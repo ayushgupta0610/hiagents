@@ -11,13 +11,10 @@ const envSchema = z.object({
   SUPABASE_URL: z.url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(10),
 
-  // Embeddings
-  OPENAI_API_KEY: z.string().min(10),
-
   // Generation
   OPENROUTER_API_KEY: z.string().min(10),
   CLASSIFIER_MODEL: z.string().default('openai/gpt-4o-mini'),
-  REPLY_MODEL: z.string().default('anthropic/claude-sonnet-4-5'),
+  REPLY_MODEL: z.string().default('deepseek/deepseek-v4-flash'),
 
   // Gmail OAuth
   GOOGLE_CLIENT_ID: z.string().min(10),

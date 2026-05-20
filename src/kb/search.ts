@@ -1,5 +1,5 @@
 import { db } from '../db/client.js';
-import { embedOne } from '../providers/openai-embeddings.js';
+import { embedOne } from '../providers/embeddings.js';
 import { env } from '../config.js';
 import type { RetrievedChunk } from '../types.js';
 
