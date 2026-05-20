@@ -26,6 +26,9 @@
     --danger: #dc2626;
     --danger-soft: #fee2e2;
     --neutral-soft: #f1f5f9;
+    --sidebar-bg: #ffffff;
+    --sidebar-active: #eef2ff;
+    --sidebar-active-text: #4f46e5;
     --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.04);
   }
   * { box-sizing: border-box; }
@@ -39,29 +42,29 @@
     font-size: 14px;
     line-height: 1.5;
   }
-  /* ============ Top nav ============ */
-  .nav {
-    background: white;
-    border-bottom: 1px solid var(--border);
+
+  /* ============ App shell ============ */
+  .shell {
+    display: grid;
+    grid-template-columns: 248px 1fr;
+    min-height: 100vh;
+  }
+  .sidebar {
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
     position: sticky;
     top: 0;
-    z-index: 10;
+    height: 100vh;
+    overflow-y: auto;
   }
-  .nav-inner {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 14px 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-  }
-  .brand {
+  .sidebar-brand {
+    padding: 18px 20px;
     display: flex;
     align-items: center;
     gap: 10px;
-    color: var(--text);
-    text-decoration: none;
+    border-bottom: 1px solid var(--border);
   }
   .brand-mark {
     width: 32px; height: 32px;
@@ -73,70 +76,133 @@
     font-size: 14px;
     letter-spacing: -0.4px;
     box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+    flex-shrink: 0;
   }
   .brand-name { font-size: 15px; font-weight: 600; letter-spacing: -0.2px; }
-  .nav-right {
+
+  .sidebar-nav {
+    padding: 12px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .nav-item {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+    border: none;
+    background: transparent;
+    text-align: left;
+    width: 100%;
+    font-family: inherit;
+  }
+  .nav-item:hover { background: var(--neutral-soft); color: var(--text); }
+  .nav-item.active { background: var(--sidebar-active); color: var(--sidebar-active-text); }
+  .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .nav-item .count {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-subtle);
+    background: var(--neutral-soft);
+    padding: 1px 8px;
+    border-radius: 10px;
+    min-width: 22px;
+    text-align: center;
+  }
+  .nav-item.active .count { background: white; color: var(--sidebar-active-text); }
+
+  .sidebar-footer {
+    padding: 12px;
+    border-top: 1px solid var(--border);
   }
   .admin-chip {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px 6px 6px;
-    background: var(--neutral-soft);
-    border-radius: 20px;
-    font-size: 13px;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
     color: var(--text);
+    font-size: 13px;
   }
-  .admin-chip .avatar {
-    width: 24px; height: 24px;
+  .avatar {
+    width: 30px; height: 30px;
     border-radius: 50%;
     background: linear-gradient(135deg, #94a3b8, #475569);
     color: white;
     font-weight: 600;
-    font-size: 11px;
+    font-size: 12px;
     display: grid; place-items: center;
     text-transform: uppercase;
+    flex-shrink: 0;
   }
-  .logout {
-    color: var(--text-muted);
-    text-decoration: none;
+  .admin-meta { min-width: 0; flex: 1; }
+  .admin-name {
+    font-weight: 500;
     font-size: 13px;
-    padding: 6px 10px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .admin-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .signout-btn {
+    margin-top: 8px;
+    width: 100%;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    padding: 7px 10px;
     border-radius: 6px;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
     transition: background 0.15s, color 0.15s;
   }
-  .logout:hover { background: var(--neutral-soft); color: var(--text); }
-  /* ============ Layout ============ */
-  main {
-    max-width: 1200px;
+  .signout-btn:hover { background: var(--neutral-soft); color: var(--text); }
+
+  /* Mobile header (hidden on desktop) */
+  .mobile-header { display: none; }
+  .backdrop { display: none; }
+
+  /* ============ Main content ============ */
+  .main {
+    padding: 32px 32px 80px;
+    max-width: 1080px;
     margin: 0 auto;
-    padding: 32px 24px 80px;
+    width: 100%;
   }
-  .page-header {
-    margin-bottom: 24px;
-  }
-  .page-header h1 {
+  .view { display: none; }
+  .view.active { display: block; }
+  .view-header { margin-bottom: 24px; }
+  .view-header h1 {
     margin: 0 0 6px;
     font-size: 24px;
     font-weight: 600;
     letter-spacing: -0.5px;
   }
-  .page-header p { margin: 0; color: var(--text-muted); }
-  /* ============ KPI cards ============ */
+  .view-header p {
+    margin: 0;
+    color: var(--text-muted);
+  }
+
+  /* ============ KPI row ============ */
   .kpi-row {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 16px;
-    margin-bottom: 32px;
-  }
-  @media (max-width: 800px) {
-    .kpi-row { grid-template-columns: repeat(2, 1fr); }
-  }
-  @media (max-width: 480px) {
-    .kpi-row { grid-template-columns: 1fr; }
+    margin-bottom: 28px;
   }
   .kpi {
     background: var(--card);
@@ -147,14 +213,14 @@
   }
   .kpi-label {
     color: var(--text-muted);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.5px;
     margin-bottom: 8px;
   }
   .kpi-value {
-    font-size: 28px;
+    font-size: 26px;
     font-weight: 600;
     letter-spacing: -0.6px;
     color: var(--text);
@@ -164,36 +230,47 @@
     font-size: 12px;
     margin-top: 4px;
   }
-  /* ============ Section cards ============ */
-  .section {
+
+  /* ============ Section card ============ */
+  .card {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: 12px;
-    margin-bottom: 24px;
+    margin-bottom: 20px;
     overflow: hidden;
     box-shadow: var(--shadow);
   }
-  .section-header {
-    padding: 18px 24px;
+  .card-header {
+    padding: 16px 20px;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
+    flex-wrap: wrap;
   }
-  .section-header h2 {
+  .card-header h2 {
     margin: 0;
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
-    letter-spacing: -0.2px;
+    letter-spacing: -0.1px;
   }
-  .section-header .sub {
+  .card-header .sub {
+    margin: 3px 0 0;
     color: var(--text-muted);
     font-size: 13px;
-    margin: 4px 0 0;
   }
-  .section-body { padding: 20px 24px 24px; }
-  /* ============ Status pills ============ */
+  .card-body { padding: 18px 20px; }
+  .card-empty {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  .card-empty .icon { font-size: 28px; opacity: 0.6; margin-bottom: 8px; }
+  .card-empty .title { color: var(--text); font-weight: 500; margin-bottom: 4px; }
+
+  /* ============ Pills ============ */
   .pill {
     display: inline-flex;
     align-items: center;
@@ -203,6 +280,7 @@
     font-size: 12px;
     font-weight: 500;
     line-height: 1.4;
+    white-space: nowrap;
   }
   .pill::before {
     content: '';
@@ -215,25 +293,28 @@
   .pill-warning, .pill-skipped, .pill-pending { background: var(--warning-soft); color: var(--warning); }
   .pill-error, .pill-failed, .pill-disconnected { background: var(--danger-soft); color: var(--danger); }
   .pill-neutral { background: var(--neutral-soft); color: var(--text-muted); }
-  /* ============ Drop zone ============ */
+
+  /* ============ Drop zone — display block fix ============ */
   .drop {
+    display: block;
     border: 2px dashed var(--border-strong);
     background: #fafbfc;
-    padding: 36px 24px;
+    padding: 32px 24px;
     text-align: center;
     border-radius: 10px;
     color: var(--text-muted);
     transition: background 0.15s, border-color 0.15s, color 0.15s;
     cursor: pointer;
+    width: 100%;
   }
   .drop:hover { background: #f8fafc; border-color: #94a3b8; }
   .drop.hover { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
   .drop.uploading { background: var(--warning-soft); border-color: var(--warning); color: var(--warning); }
-  .drop-icon { font-size: 28px; line-height: 1; margin-bottom: 8px; }
+  .drop-icon { font-size: 26px; line-height: 1; margin-bottom: 8px; }
   .drop-text { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
   .drop-hint { font-size: 12px; color: var(--text-muted); }
   .drop input[type="file"] { display: none; }
-  /* ============ Upload status list ============ */
+
   .upload-list { margin-top: 12px; }
   .upload-row {
     display: flex;
@@ -248,13 +329,10 @@
   .upload-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
   .upload-row.success { background: var(--success-soft); color: var(--success); }
   .upload-row.error { background: var(--danger-soft); color: var(--danger); }
+
   /* ============ Tables ============ */
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 16px;
-    font-size: 13px;
-  }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
   thead th {
     text-align: left;
     color: var(--text-muted);
@@ -262,25 +340,72 @@
     text-transform: uppercase;
     font-size: 11px;
     letter-spacing: 0.5px;
-    padding: 10px 12px;
+    padding: 10px 16px;
     border-bottom: 1px solid var(--border);
     background: #fafbfc;
+    white-space: nowrap;
   }
   tbody td {
-    padding: 14px 12px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border);
     vertical-align: top;
   }
   tbody tr:last-child td { border-bottom: none; }
-  tbody tr:hover { background: #fafbfc; }
-  .table-wrap {
-    margin: 0 -24px;
-    border-top: 1px solid var(--border);
+  .activity-row { cursor: pointer; transition: background 0.15s; }
+  .activity-row:hover { background: #fafbfc; }
+  .activity-row.expanded { background: var(--primary-soft); }
+  .activity-detail { display: none; background: #fafbfc; }
+  .activity-detail.show { display: table-row; }
+  .activity-detail td {
+    padding: 16px 20px 20px;
+    border-top: 1px dashed var(--border);
   }
-  .table-wrap thead th:first-child { padding-left: 24px; }
-  .table-wrap thead th:last-child { padding-right: 24px; }
-  .table-wrap tbody td:first-child { padding-left: 24px; }
-  .table-wrap tbody td:last-child { padding-right: 24px; }
+  .reply-block {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-family: 'SF Mono', 'Monaco', monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: var(--text);
+    max-height: 360px;
+    overflow-y: auto;
+  }
+  .detail-meta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+  .detail-meta b { color: var(--text); font-weight: 500; }
+
+  /* ============ Filter chips ============ */
+  .chips {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  .chip {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: white;
+    color: var(--text-muted);
+    cursor: pointer;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 500;
+    transition: all 0.15s;
+  }
+  .chip:hover { background: var(--neutral-soft); color: var(--text); }
+  .chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+
   /* ============ Buttons ============ */
   .btn {
     display: inline-flex;
@@ -301,25 +426,13 @@
   .btn:hover { background: var(--neutral-soft); }
   .btn-danger { color: var(--danger); border-color: var(--danger-soft); }
   .btn-danger:hover { background: var(--danger-soft); }
-  .btn-primary {
-    background: var(--primary);
-    color: white;
-    border-color: var(--primary);
-  }
+  .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
   .btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
-  /* ============ Empty + loading states ============ */
-  .empty {
-    padding: 32px 16px;
-    text-align: center;
-    color: var(--text-muted);
-    font-size: 13px;
-  }
-  .empty .icon { font-size: 24px; opacity: 0.5; margin-bottom: 8px; }
-  .empty-title { color: var(--text); font-weight: 500; margin-bottom: 4px; }
-  .skeleton { color: var(--text-subtle); font-size: 13px; }
+
   small { color: var(--text-muted); }
   code { font-family: 'SF Mono', 'Monaco', monospace; font-size: 12px; background: var(--neutral-soft); padding: 1px 5px; border-radius: 3px; }
-  /* ============ Connection card content ============ */
+
+  /* ============ Connection row ============ */
   .conn-row {
     display: flex;
     align-items: center;
@@ -328,6 +441,7 @@
   }
   .conn-email { font-weight: 500; }
   .conn-meta { color: var(--text-muted); font-size: 12px; }
+
   /* ============ Banner ============ */
   .banner {
     padding: 12px 16px;
@@ -344,133 +458,284 @@
     background: none; border: none;
     color: inherit; opacity: 0.6;
     font-size: 16px; line-height: 1;
-    cursor: pointer;
-    padding: 0;
+    cursor: pointer; padding: 0;
   }
   .banner .close:hover { opacity: 1; }
+
+  /* ============ Responsive ============ */
+  @media (max-width: 900px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .main { padding: 24px 20px 60px; }
+  }
+  @media (max-width: 768px) {
+    .shell { grid-template-columns: 1fr; }
+    .sidebar {
+      position: fixed;
+      top: 0; left: 0;
+      width: 260px;
+      transform: translateX(-100%);
+      transition: transform 0.2s ease;
+      z-index: 30;
+      box-shadow: 0 10px 40px rgba(15, 23, 42, 0.15);
+    }
+    .shell.sidebar-open .sidebar { transform: translateX(0); }
+    .shell.sidebar-open .backdrop {
+      display: block;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.4);
+      z-index: 20;
+    }
+    .mobile-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      background: white;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .hamburger {
+      width: 36px; height: 36px;
+      border: 1px solid var(--border);
+      background: white;
+      border-radius: 8px;
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      padding: 0;
+    }
+    .hamburger svg { width: 18px; height: 18px; }
+    .main { padding: 16px; }
+    .view-header h1 { font-size: 20px; }
+  }
+  @media (max-width: 480px) {
+    .kpi-row { grid-template-columns: 1fr; }
+    thead th, tbody td { padding-left: 12px; padding-right: 12px; }
+  }
 </style>
 </head>
 <body>
 
-<nav class="nav">
-  <div class="nav-inner">
-    <a class="brand" href="/admin">
+<div class="shell" id="shell">
+  <div class="backdrop" id="backdrop"></div>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
       <div class="brand-mark">ia</div>
       <div class="brand-name">inbox-ai</div>
-    </a>
-    <div class="nav-right">
-      <div class="admin-chip" id="admin-chip" title="Signed in">
+    </div>
+    <nav class="sidebar-nav" id="nav">
+      <button class="nav-item" data-route="overview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Overview
+      </button>
+      <button class="nav-item" data-route="activity">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H5.17L4 17.17V4z"/><path d="M4 4l8 7 8-7"/></svg>
+        Activity
+        <span class="count" id="nav-count-activity">—</span>
+      </button>
+      <button class="nav-item" data-route="kb">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h12a4 4 0 0 1 4 4v12H8a4 4 0 0 1-4-4V4z"/><path d="M4 16h12"/></svg>
+        Knowledge base
+        <span class="count" id="nav-count-kb">—</span>
+      </button>
+      <button class="nav-item" data-route="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </button>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-chip">
         <div class="avatar" id="admin-avatar">·</div>
-        <span id="admin-email">loading…</span>
+        <div class="admin-meta">
+          <div class="admin-name" id="admin-email">loading…</div>
+          <div class="admin-sub" id="admin-sub">signed in</div>
+        </div>
       </div>
-      <a class="logout" href="/admin/auth/logout">Sign out</a>
+      <button class="signout-btn" id="signout-btn">Sign out</button>
     </div>
+  </aside>
+
+  <div class="main-shell">
+    <header class="mobile-header">
+      <button class="hamburger" id="hamburger" aria-label="Open menu">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div class="brand-mark" style="width: 26px; height: 26px; font-size: 12px">ia</div>
+      <div class="brand-name">inbox-ai</div>
+    </header>
+
+    <main class="main">
+      <div id="global-error" class="banner banner-error">
+        <span id="global-error-msg"></span>
+        <button class="close" onclick="this.parentElement.classList.remove('show')">×</button>
+      </div>
+
+      <!-- ============ Overview ============ -->
+      <section id="view-overview" class="view">
+        <div class="view-header">
+          <h1>Overview</h1>
+          <p>Live snapshot of your knowledge base and recent email handling.</p>
+        </div>
+
+        <div class="kpi-row">
+          <div class="kpi">
+            <div class="kpi-label">Documents</div>
+            <div class="kpi-value" id="kpi-documents">—</div>
+            <div class="kpi-sub">ingested PDFs</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Replies sent</div>
+            <div class="kpi-value" id="kpi-sent">—</div>
+            <div class="kpi-sub" id="kpi-sent-sub">last 7 days</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Skipped</div>
+            <div class="kpi-value" id="kpi-skipped">—</div>
+            <div class="kpi-sub">last 7 days</div>
+          </div>
+          <div class="kpi">
+            <div class="kpi-label">Last email</div>
+            <div class="kpi-value" id="kpi-last" style="font-size: 18px">—</div>
+            <div class="kpi-sub">received by the bot</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Gmail connection</h2>
+              <p class="sub">The mailbox the bot polls and replies from.</p>
+            </div>
+            <a class="btn" href="/oauth/start">Reconnect</a>
+          </div>
+          <div class="card-body">
+            <div id="gmail-status" class="conn-row">
+              <span class="conn-meta">Loading…</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ Activity ============ -->
+      <section id="view-activity" class="view">
+        <div class="view-header">
+          <h1>Activity</h1>
+          <p>Recent emails the bot has processed. Click any row to see the reply it sent.</p>
+        </div>
+
+        <div class="chips" id="activity-filters">
+          <button class="chip active" data-filter="all">All</button>
+          <button class="chip" data-filter="sent">Sent</button>
+          <button class="chip" data-filter="skipped">Skipped</button>
+          <button class="chip" data-filter="failed">Failed</button>
+        </div>
+
+        <div class="card">
+          <div class="table-wrap">
+            <table id="msgs">
+              <thead>
+                <tr>
+                  <th>Received</th>
+                  <th>From</th>
+                  <th>Subject</th>
+                  <th>Class</th>
+                  <th>Reply</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="5" class="card-empty">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ Knowledge base ============ -->
+      <section id="view-kb" class="view">
+        <div class="view-header">
+          <h1>Knowledge base</h1>
+          <p>PDFs the bot draws answers from. Drop new files to add them.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-body">
+            <label for="file" class="drop" id="drop">
+              <div class="drop-icon">📄</div>
+              <div class="drop-text">Drop PDFs here, or click to choose files</div>
+              <div class="drop-hint">Max 25 MB per file</div>
+              <input type="file" id="file" accept="application/pdf" multiple>
+            </label>
+            <div id="upload-list" class="upload-list"></div>
+          </div>
+          <div class="table-wrap">
+            <table id="docs">
+              <thead>
+                <tr>
+                  <th>File</th>
+                  <th>Status</th>
+                  <th>Uploaded</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td colspan="4" class="card-empty">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ Settings ============ -->
+      <section id="view-settings" class="view">
+        <div class="view-header">
+          <h1>Settings</h1>
+          <p>Connection + account.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Gmail mailbox</h2>
+              <p class="sub">The Gmail account the bot polls and replies from.</p>
+            </div>
+            <a class="btn btn-primary" href="/oauth/start">Reconnect Gmail</a>
+          </div>
+          <div class="card-body">
+            <div id="gmail-status-settings" class="conn-row">
+              <span class="conn-meta">Loading…</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <h2>Account</h2>
+              <p class="sub">Who's currently signed in to this dashboard.</p>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="conn-row">
+              <div class="avatar" id="settings-avatar">·</div>
+              <span class="conn-email" id="settings-email">—</span>
+              <span class="conn-meta" id="settings-method">—</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
   </div>
-</nav>
-
-<main>
-  <div class="page-header">
-    <h1>Dashboard</h1>
-    <p>Knowledge base, Gmail connection, and recent activity at a glance.</p>
-  </div>
-
-  <div id="global-error" class="banner banner-error">
-    <span id="global-error-msg"></span>
-    <button class="close" onclick="this.parentElement.classList.remove('show')">×</button>
-  </div>
-
-  <!-- KPI row -->
-  <div class="kpi-row">
-    <div class="kpi">
-      <div class="kpi-label">Documents</div>
-      <div class="kpi-value" id="kpi-documents">—</div>
-      <div class="kpi-sub" id="kpi-documents-sub">ingested PDFs</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Chunks</div>
-      <div class="kpi-value" id="kpi-chunks">—</div>
-      <div class="kpi-sub">searchable passages</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Replies sent</div>
-      <div class="kpi-value" id="kpi-sent">—</div>
-      <div class="kpi-sub" id="kpi-sent-sub">last 7 days</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Last email</div>
-      <div class="kpi-value" id="kpi-last" style="font-size: 18px">—</div>
-      <div class="kpi-sub" id="kpi-last-sub">received by the bot</div>
-    </div>
-  </div>
-
-  <!-- Gmail connection -->
-  <section class="section">
-    <div class="section-header">
-      <div>
-        <h2>Gmail connection</h2>
-        <p class="sub">The mailbox the bot polls and replies from.</p>
-      </div>
-      <a class="btn" href="/oauth/start" id="connect-btn">Connect / reconnect</a>
-    </div>
-    <div class="section-body">
-      <div id="gmail-status" class="conn-row">
-        <span class="skeleton">Loading…</span>
-      </div>
-    </div>
-  </section>
-
-  <!-- Knowledge base -->
-  <section class="section">
-    <div class="section-header">
-      <div>
-        <h2>Knowledge base</h2>
-        <p class="sub">PDFs the bot draws answers from. Drop new files to add to the KB.</p>
-      </div>
-    </div>
-    <div class="section-body">
-      <label for="file" class="drop" id="drop">
-        <div class="drop-icon">📄</div>
-        <div class="drop-text">Drop PDFs here, or click to choose files</div>
-        <div class="drop-hint">Max 25 MB per file</div>
-        <input type="file" id="file" accept="application/pdf" multiple>
-      </label>
-      <div id="upload-list" class="upload-list"></div>
-    </div>
-    <div class="table-wrap">
-      <table id="docs">
-        <thead><tr>
-          <th>File</th><th>Status</th><th>Chunks</th><th>Uploaded</th><th></th>
-        </tr></thead>
-        <tbody><tr><td colspan="5" class="empty"><div class="skeleton">Loading documents…</div></td></tr></tbody>
-      </table>
-    </div>
-  </section>
-
-  <!-- Recent activity -->
-  <section class="section">
-    <div class="section-header">
-      <div>
-        <h2>Recent activity</h2>
-        <p class="sub">Latest 100 emails processed by the bot. Auto-refreshes every 30s.</p>
-      </div>
-    </div>
-    <div class="table-wrap">
-      <table id="msgs">
-        <thead><tr>
-          <th>Received</th><th>From</th><th>Subject</th><th>Class</th><th>Reply</th>
-        </tr></thead>
-        <tbody><tr><td colspan="5" class="empty"><div class="skeleton">Loading activity…</div></td></tr></tbody>
-      </table>
-    </div>
-  </section>
-</main>
+</div>
 
 <script>
-// Defensive: unregister any service worker left over from another app on this origin
+// Defensive: unregister any service worker left over from another app
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.getRegistrations().then((regs) => {
     if (regs.length > 0) {
-      console.warn('[inbox-ai] Unregistering', regs.length, 'leftover service worker(s)');
       regs.forEach((r) => r.unregister());
     }
   }).catch(() => {});
@@ -479,15 +744,15 @@ if ('serviceWorker' in navigator) {
   }
 }
 
+function $(sel) { return document.querySelector(sel); }
+function $$(sel) { return Array.from(document.querySelectorAll(sel)); }
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
-
-function showGlobalError(msg) {
-  document.getElementById('global-error-msg').textContent = msg;
-  document.getElementById('global-error').classList.add('show');
+function showError(msg) {
+  $('#global-error-msg').textContent = msg;
+  $('#global-error').classList.add('show');
 }
-
 function relativeTime(iso) {
   if (!iso) return '—';
   const ms = Date.now() - new Date(iso).getTime();
@@ -512,7 +777,7 @@ async function safeFetch(url, opts) {
   }
   if (res.status === 401) {
     window.location.href = '/admin/login';
-    throw new Error('Session expired — redirecting to login');
+    throw new Error('Session expired — redirecting');
   }
   if (!res.ok) {
     let detail = '';
@@ -522,72 +787,112 @@ async function safeFetch(url, opts) {
   return res.json();
 }
 
-// ============ Loaders ============
+// ============ Router ============
+const ROUTES = ['overview', 'activity', 'kb', 'settings'];
+
+function route(name) {
+  if (!ROUTES.includes(name)) name = 'overview';
+  $$('.view').forEach((el) => el.classList.toggle('active', el.id === `view-${name}`));
+  $$('.nav-item').forEach((el) => el.classList.toggle('active', el.dataset.route === name));
+  // close sidebar on mobile after navigation
+  $('#shell').classList.remove('sidebar-open');
+  if (location.hash !== `#${name}`) {
+    history.replaceState(null, '', `#${name}`);
+  }
+}
+
+function initRouter() {
+  $$('.nav-item').forEach((el) => {
+    el.addEventListener('click', () => route(el.dataset.route));
+  });
+  window.addEventListener('hashchange', () => route(location.hash.slice(1) || 'overview'));
+  route(location.hash.slice(1) || 'overview');
+}
+
+// ============ Sidebar toggle (mobile) ============
+$('#hamburger')?.addEventListener('click', () => {
+  $('#shell').classList.toggle('sidebar-open');
+});
+$('#backdrop')?.addEventListener('click', () => {
+  $('#shell').classList.remove('sidebar-open');
+});
+
+// ============ Sign out ============
+$('#signout-btn').addEventListener('click', async () => {
+  try {
+    await safeFetch('/admin/auth/logout', { method: 'POST' });
+  } catch {}
+  window.location.href = '/admin/login';
+});
+
+// ============ Data loaders ============
+let cachedMsgs = [];
+let activeFilter = 'all';
+
 async function loadStatus() {
   try {
     const data = await safeFetch('/admin/api/status');
-    // Admin chip
     const adminEmail = data.admin?.email;
-    const chip = document.getElementById('admin-email');
-    const avatar = document.getElementById('admin-avatar');
     if (adminEmail) {
-      chip.textContent = adminEmail;
-      avatar.textContent = adminEmail.charAt(0);
+      $('#admin-email').textContent = adminEmail;
+      $('#admin-avatar').textContent = adminEmail.charAt(0);
+      $('#admin-sub').textContent = 'Google sign-in';
+      $('#settings-email').textContent = adminEmail;
+      $('#settings-avatar').textContent = adminEmail.charAt(0);
+      $('#settings-method').textContent = 'signed in via Google';
     } else {
-      chip.textContent = 'admin (password)';
-      avatar.textContent = 'A';
+      $('#admin-email').textContent = 'admin';
+      $('#admin-avatar').textContent = 'A';
+      $('#admin-sub').textContent = 'password sign-in';
+      $('#settings-email').textContent = 'admin (password)';
+      $('#settings-avatar').textContent = 'A';
+      $('#settings-method').textContent = 'signed in via password';
     }
-    // Gmail status
-    const el = document.getElementById('gmail-status');
-    if (data.gmail) {
-      el.innerHTML = `
-        <span class="pill pill-connected">Connected</span>
-        <span class="conn-email">${escapeHtml(data.gmail.email)}</span>
-        <span class="conn-meta">Updated ${relativeTime(data.gmail.updated_at)}</span>
-      `;
-    } else {
-      el.innerHTML = `
-        <span class="pill pill-disconnected">Not connected</span>
-        <span class="conn-meta">The bot will not poll or reply until Gmail is connected.</span>
-      `;
-    }
+    // Gmail status (rendered in two places)
+    const statusHtml = data.gmail
+      ? `<span class="pill pill-connected">Connected</span>
+         <span class="conn-email">${escapeHtml(data.gmail.email)}</span>
+         <span class="conn-meta">Updated ${relativeTime(data.gmail.updated_at)}</span>`
+      : `<span class="pill pill-disconnected">Not connected</span>
+         <span class="conn-meta">The bot won't poll or reply until Gmail is connected.</span>`;
+    $('#gmail-status').innerHTML = statusHtml;
+    $('#gmail-status-settings').innerHTML = statusHtml;
   } catch (err) {
-    document.getElementById('gmail-status').innerHTML = `<span class="pill pill-failed">Error</span> <span class="conn-meta">${escapeHtml(err.message)}</span>`;
+    showError('Failed to load status: ' + err.message);
   }
 }
 
 async function loadStats() {
   try {
     const data = await safeFetch('/admin/api/stats');
-    document.getElementById('kpi-documents').textContent = data.documents;
-    document.getElementById('kpi-chunks').textContent = data.chunks.toLocaleString();
-    document.getElementById('kpi-sent').textContent = data.repliesSent7d;
-    document.getElementById('kpi-sent-sub').textContent = `last 7 days · ${data.repliesSkipped7d} skipped`;
-    document.getElementById('kpi-last').textContent = data.lastEmailAt ? relativeTime(data.lastEmailAt) : 'No emails yet';
+    $('#kpi-documents').textContent = data.documents;
+    $('#kpi-sent').textContent = data.repliesSent7d;
+    $('#kpi-skipped').textContent = data.repliesSkipped7d;
+    $('#kpi-last').textContent = data.lastEmailAt ? relativeTime(data.lastEmailAt) : 'None yet';
+    $('#nav-count-kb').textContent = data.documents;
   } catch (err) {
-    showGlobalError('Failed to load stats: ' + err.message);
+    showError('Failed to load stats: ' + err.message);
   }
 }
 
 async function loadDocs() {
-  const tbody = document.querySelector('#docs tbody');
+  const tbody = $('#docs tbody');
   try {
     const docs = await safeFetch('/admin/api/documents');
     if (docs.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="icon">📚</div><div class="empty-title">No documents yet</div>Drop a PDF above to add it to the knowledge base.</div></td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="4"><div class="card-empty"><div class="icon">📚</div><div class="title">No documents yet</div>Drop a PDF above to add it to the knowledge base.</div></td></tr>`;
       return false;
     }
     let anyPending = false;
     tbody.innerHTML = '';
     for (const d of docs) {
       if (d.status === 'pending') anyPending = true;
-      const statusHtml = `<span class="pill pill-${d.status}">${d.status}</span>` +
+      const statusCell = `<span class="pill pill-${d.status}">${d.status}</span>` +
         (d.error ? `<div style="margin-top:6px"><small>${escapeHtml(d.error)}</small></div>` : '');
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td style="font-weight: 500">${escapeHtml(d.filename)}</td>
-        <td>${statusHtml}</td>
-        <td>${d.chunk_count ?? '—'}</td>
+        <td style="font-weight:500">${escapeHtml(d.filename)}</td>
+        <td>${statusCell}</td>
         <td><small>${relativeTime(d.uploaded_at)}</small></td>
         <td><button data-id="${d.id}" class="btn btn-danger" data-del>Delete</button></td>
       `;
@@ -596,7 +901,7 @@ async function loadDocs() {
     tbody.querySelectorAll('button[data-del]').forEach((b) => b.addEventListener('click', () => deleteDoc(b.dataset.id)));
     return anyPending;
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><span class="pill pill-failed">Error</span> ${escapeHtml(err.message)}</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="4"><div class="card-empty"><span class="pill pill-failed">Error</span> ${escapeHtml(err.message)}</div></td></tr>`;
     return false;
   }
 }
@@ -605,47 +910,116 @@ async function deleteDoc(id) {
   if (!confirm('Delete this document and its chunks?')) return;
   try {
     await safeFetch('/admin/api/documents/' + id, { method: 'DELETE' });
-    loadDocs();
-    loadStats();
+    loadDocs(); loadStats();
   } catch (err) {
-    showGlobalError('Failed to delete document: ' + err.message);
+    showError('Failed to delete: ' + err.message);
   }
 }
 
 async function loadMsgs() {
-  const tbody = document.querySelector('#msgs tbody');
+  const tbody = $('#msgs tbody');
   try {
-    const msgs = await safeFetch('/admin/api/messages');
-    if (msgs.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><div class="icon">📬</div><div class="empty-title">No emails processed yet</div>The bot polls Gmail every 30 seconds. Once mail arrives, you'll see it here.</div></td></tr>`;
-      return;
-    }
-    tbody.innerHTML = '';
-    for (const m of msgs) {
-      const pillClass = m.reply_status === 'sent' ? 'pill-sent' : m.reply_status === 'failed' ? 'pill-failed' : 'pill-skipped';
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td><small>${new Date(m.received_at).toLocaleString()}</small></td>
-        <td>${escapeHtml(m.from_address)}</td>
-        <td>${escapeHtml(m.subject || '')}</td>
-        <td><span class="pill pill-neutral">${m.classification || ''}</span></td>
-        <td>
-          <span class="pill ${pillClass}">${m.reply_status || ''}</span>
-          ${m.reply_reason ? `<div style="margin-top:4px"><small>${escapeHtml(m.reply_reason)}</small></div>` : ''}
-        </td>
-      `;
-      tbody.appendChild(tr);
-    }
+    cachedMsgs = await safeFetch('/admin/api/messages');
+    renderMsgs();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="5"><div class="empty"><span class="pill pill-failed">Error</span> ${escapeHtml(err.message)}</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5"><div class="card-empty"><span class="pill pill-failed">Error</span> ${escapeHtml(err.message)}</div></td></tr>`;
   }
 }
 
-// ============ Upload ============
-const drop = document.getElementById('drop');
-const fileInput = document.getElementById('file');
-const uploadList = document.getElementById('upload-list');
+function filterMsg(m) {
+  if (activeFilter === 'all') return true;
+  if (activeFilter === 'sent') return m.reply_status === 'sent';
+  if (activeFilter === 'skipped') return m.reply_status === 'skipped';
+  if (activeFilter === 'failed') return m.reply_status === 'failed';
+  return true;
+}
 
+function renderMsgs() {
+  const tbody = $('#msgs tbody');
+  const filtered = cachedMsgs.filter(filterMsg);
+  $('#nav-count-activity').textContent = cachedMsgs.length;
+
+  if (filtered.length === 0) {
+    if (cachedMsgs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5"><div class="card-empty"><div class="icon">📬</div><div class="title">No emails processed yet</div>The bot polls Gmail every 30 seconds. Once mail arrives, you'll see it here.</div></td></tr>`;
+    } else {
+      tbody.innerHTML = `<tr><td colspan="5"><div class="card-empty">No emails match this filter. <button class="btn" onclick="setFilter('all')">Clear filter</button></div></td></tr>`;
+    }
+    return;
+  }
+
+  tbody.innerHTML = '';
+  for (const m of filtered) {
+    const pillClass = m.reply_status === 'sent' ? 'pill-sent' : m.reply_status === 'failed' ? 'pill-failed' : 'pill-skipped';
+    const row = document.createElement('tr');
+    row.className = 'activity-row';
+    row.dataset.id = m.id;
+    row.innerHTML = `
+      <td><small>${new Date(m.received_at).toLocaleString()}</small></td>
+      <td style="max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${escapeHtml(m.from_address)}</td>
+      <td>${escapeHtml(m.subject || '')}</td>
+      <td><span class="pill pill-neutral">${m.classification || ''}</span></td>
+      <td><span class="pill ${pillClass}">${m.reply_status || ''}</span></td>
+    `;
+    tbody.appendChild(row);
+
+    // Expandable detail row
+    const detail = document.createElement('tr');
+    detail.className = 'activity-detail';
+    detail.dataset.detailFor = m.id;
+
+    let detailContent = '';
+    if (m.reply_text) {
+      detailContent = `
+        <div style="font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px">Reply sent</div>
+        <div class="reply-block">${escapeHtml(m.reply_text)}</div>
+      `;
+    } else if (m.reply_reason) {
+      detailContent = `
+        <div style="font-size: 11px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px">Why no reply</div>
+        <div class="reply-block">${escapeHtml(m.reply_reason)}</div>
+      `;
+    } else {
+      detailContent = `<div class="card-empty" style="padding: 16px">No details available.</div>`;
+    }
+
+    const meta = [];
+    if (m.top_similarity != null) meta.push(`<span><b>top similarity:</b> ${m.top_similarity.toFixed(3)}</span>`);
+    if (m.retrieved_chunk_ids?.length) meta.push(`<span><b>chunks used:</b> ${m.retrieved_chunk_ids.length}</span>`);
+    if (m.reply_sent_at) meta.push(`<span><b>sent:</b> ${new Date(m.reply_sent_at).toLocaleString()}</span>`);
+    if (m.reply_status === 'failed' && m.reply_reason) meta.push(`<span><b>error:</b> ${escapeHtml(m.reply_reason)}</span>`);
+
+    detail.innerHTML = `<td colspan="5">${detailContent}${meta.length ? `<div class="detail-meta">${meta.join('')}</div>` : ''}</td>`;
+    tbody.appendChild(detail);
+
+    row.addEventListener('click', () => {
+      const wasOpen = detail.classList.contains('show');
+      // close all
+      $$('.activity-detail.show').forEach((d) => d.classList.remove('show'));
+      $$('.activity-row.expanded').forEach((r) => r.classList.remove('expanded'));
+      if (!wasOpen) {
+        detail.classList.add('show');
+        row.classList.add('expanded');
+      }
+    });
+  }
+}
+
+function setFilter(filter) {
+  activeFilter = filter;
+  $$('#activity-filters .chip').forEach((el) => el.classList.toggle('active', el.dataset.filter === filter));
+  renderMsgs();
+}
+window.setFilter = setFilter;
+
+$$('#activity-filters .chip').forEach((el) => {
+  el.addEventListener('click', () => setFilter(el.dataset.filter));
+});
+
+// ============ Upload ============
+const drop = $('#drop');
+const fileInput = $('#file');
+const uploadList = $('#upload-list');
 ['dragover', 'dragenter'].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.add('hover'); }));
 ['dragleave', 'drop'].forEach((e) => drop.addEventListener(e, () => drop.classList.remove('hover')));
 drop.addEventListener('drop', async (ev) => {
@@ -664,8 +1038,7 @@ async function uploadAll(files) {
     for (const f of files) await uploadFile(f);
   } finally {
     drop.classList.remove('uploading');
-    loadDocs();
-    loadStats();
+    loadDocs(); loadStats();
   }
 }
 
@@ -689,9 +1062,9 @@ async function uploadFile(file) {
   const fd = new FormData();
   fd.append('file', file);
   try {
-    const result = await safeFetch('/admin/api/documents', { method: 'POST', body: fd });
+    await safeFetch('/admin/api/documents', { method: 'POST', body: fd });
     row.classList.add('success');
-    row.querySelector('.state').textContent = `ingested · ${result.chunkCount} chunks`;
+    row.querySelector('.state').textContent = 'ingested';
   } catch (err) {
     row.classList.add('error');
     row.querySelector('.state').textContent = err.message;
@@ -710,6 +1083,7 @@ async function refreshDocs() {
   }
 }
 
+initRouter();
 loadStatus();
 loadStats();
 refreshDocs();
