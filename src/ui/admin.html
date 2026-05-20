@@ -693,31 +693,85 @@
       <section id="view-settings" class="view">
         <div class="view-header">
           <h1>Settings</h1>
-          <p>Connection + account.</p>
+          <p>Tune how the bot behaves. Changes apply on the next polling cycle.</p>
         </div>
 
         <div class="card">
           <div class="card-header">
-            <div>
-              <h2>Gmail mailbox</h2>
-              <p class="sub">The Gmail account the bot polls and replies from.</p>
-            </div>
+            <div><h2>Gmail mailbox</h2><p class="sub">The Gmail account the bot polls and replies from.</p></div>
             <a class="btn btn-primary" href="/oauth/start">Reconnect Gmail</a>
           </div>
           <div class="card-body">
-            <div id="gmail-status-settings" class="conn-row">
-              <span class="conn-meta">Loading…</span>
-            </div>
+            <div id="gmail-status-settings" class="conn-row"><span class="conn-meta">Loading…</span></div>
           </div>
         </div>
 
         <div class="card">
-          <div class="card-header">
-            <div>
-              <h2>Account</h2>
-              <p class="sub">Who's currently signed in to this dashboard.</p>
-            </div>
+          <div class="card-header"><div><h2>Persona</h2><p class="sub">Tone, signature, and company description the bot uses in replies.</p></div></div>
+          <div class="card-body">
+            <label style="font-size:13px;font-weight:500;margin-bottom:6px;display:block">Tone</label>
+            <input id="set-tone" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:6px;font:inherit;font-size:13px;margin-bottom:12px">
+            <label style="font-size:13px;font-weight:500;margin-bottom:6px;display:block">Signature</label>
+            <input id="set-signature" maxlength="200" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:6px;font:inherit;font-size:13px;margin-bottom:12px">
+            <label style="font-size:13px;font-weight:500;margin-bottom:6px;display:block">Company description</label>
+            <textarea id="set-company" maxlength="1000" rows="4" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:6px;font:inherit;font-size:13px;margin-bottom:12px;resize:vertical"></textarea>
+            <button class="btn btn-primary" id="save-persona">Save persona</button>
           </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div><h2>Models & retrieval</h2><p class="sub">Which LLMs the bot uses and how strict retrieval is.</p></div></div>
+          <div class="card-body">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+              <div>
+                <label style="font-size:13px;font-weight:500;margin-bottom:6px;display:block">Reply model</label>
+                <select id="set-reply-model" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:6px;font:inherit;font-size:13px;background:white"></select>
+              </div>
+              <div>
+                <label style="font-size:13px;font-weight:500;margin-bottom:6px;display:block">Classifier model</label>
+                <select id="set-classifier-model" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:6px;font:inherit;font-size:13px;background:white"></select>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px">
+              <div>
+                <label style="font-size:13px;font-weight:500;margin-bottom:6px;display:block">Similarity threshold (0-1)</label>
+                <input id="set-threshold" type="number" min="0" max="1" step="0.05" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:6px;font:inherit;font-size:13px">
+              </div>
+              <div>
+                <label style="font-size:13px;font-weight:500;margin-bottom:6px;display:block">Top-K chunks</label>
+                <input id="set-topk" type="number" min="1" max="50" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:6px;font:inherit;font-size:13px">
+              </div>
+            </div>
+            <button class="btn btn-primary" id="save-models" style="margin-top:16px">Save models & retrieval</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div><h2>Classifier prompt</h2><p class="sub">Override the prompt the classifier uses. Leave empty to use the smart default.</p></div></div>
+          <div class="card-body">
+            <textarea id="set-classifier-prompt" rows="6" maxlength="2000" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:6px;font:inherit;font-size:13px;resize:vertical"></textarea>
+            <button class="btn btn-primary" id="save-classifier-prompt" style="margin-top:12px">Save classifier prompt</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div><h2>Auto-send</h2><p class="sub">When off, the bot records replies as drafts in the audit log for review.</p></div></div>
+          <div class="card-body">
+            <label style="display:flex;gap:12px;align-items:center;cursor:pointer">
+              <input type="checkbox" id="set-auto-send" style="width:18px;height:18px;margin:0">
+              <span style="font-size:14px">Auto-send replies (bot sends without human review)</span>
+            </label>
+            <button class="btn btn-primary" id="save-auto-send" style="margin-top:16px">Save</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div><h2>LLM usage (last 30 days)</h2><p class="sub">Per-model token and cost breakdown for this workspace.</p></div></div>
+          <div class="card-body"><div id="usage-summary"><div style="color:var(--text-muted)">Loading…</div></div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><div><h2>Account</h2><p class="sub">Who's signed in.</p></div></div>
           <div class="card-body">
             <div class="conn-row">
               <div class="avatar" id="settings-avatar">·</div>
@@ -725,6 +779,11 @@
               <span class="conn-meta" id="settings-method">—</span>
             </div>
           </div>
+        </div>
+
+        <div class="card" style="border-color:#fca5a5">
+          <div class="card-header"><div><h2 style="color:var(--danger)">Danger zone</h2><p class="sub">Soft-delete this workspace and all its data. We hold for 30 days before hard delete.</p></div></div>
+          <div class="card-body"><button class="btn btn-danger" id="delete-account">Delete this workspace</button></div>
         </div>
       </section>
     </main>
@@ -799,6 +858,7 @@ function route(name) {
   if (location.hash !== `#${name}`) {
     history.replaceState(null, '', `#${name}`);
   }
+  if (name === 'settings' && typeof loadSettings === 'function') loadSettings();
 }
 
 function initRouter() {
@@ -1082,6 +1142,72 @@ async function refreshDocs() {
     }, 3000);
   }
 }
+
+// ============ Settings ============
+async function loadSettings() {
+  if (location.hash !== '#settings') return;
+  try {
+    const { settings, allowed } = await safeFetch('/admin/api/settings/');
+    $('#set-tone').value = settings.persona.tone;
+    $('#set-signature').value = settings.persona.signature;
+    $('#set-company').value = settings.persona.companyDescription;
+    $('#set-threshold').value = settings.retrieval.similarityThreshold;
+    $('#set-topk').value = settings.retrieval.topK;
+    $('#set-classifier-prompt').value = settings.classifier.prompt ?? '';
+    $('#set-auto-send').checked = settings.polling.autoSend;
+
+    const replySel = $('#set-reply-model'); replySel.innerHTML = '';
+    for (const m of allowed.replyModels) {
+      const o = document.createElement('option');
+      o.value = m; o.textContent = m; o.selected = m === settings.reply.model;
+      replySel.appendChild(o);
+    }
+    const classSel = $('#set-classifier-model'); classSel.innerHTML = '';
+    for (const m of allowed.classifierModels) {
+      const o = document.createElement('option');
+      o.value = m; o.textContent = m; o.selected = m === settings.classifier.model;
+      classSel.appendChild(o);
+    }
+
+    const usage = await safeFetch('/admin/api/settings/usage');
+    $('#usage-summary').innerHTML = `
+      <div style="font-size:14px;margin-bottom:8px"><strong>${usage.totalTokens.toLocaleString()}</strong> tokens · <strong>$${usage.totalCostUsd.toFixed(4)}</strong> total</div>
+      ${usage.byModel.length === 0 ? '<div style="color:var(--text-muted)">No usage yet.</div>' :
+        '<table style="width:100%;margin-top:8px"><thead><tr><th>Model</th><th>Tokens</th><th>Cost</th></tr></thead><tbody>' +
+        usage.byModel.map(m => `<tr><td>${escapeHtml(m.model)}</td><td>${m.tokens.toLocaleString()}</td><td>$${m.costUsd.toFixed(4)}</td></tr>`).join('') +
+        '</tbody></table>'}
+    `;
+  } catch (e) { showError('Settings load failed: ' + e.message); }
+}
+
+async function saveSettings(patch, msg) {
+  try {
+    await safeFetch('/admin/api/settings/', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
+    showError(msg + ' saved ✓');
+  } catch (e) { showError('Save failed: ' + e.message); }
+}
+
+$('#save-persona')?.addEventListener('click', () => saveSettings({
+  persona: { tone: $('#set-tone').value, signature: $('#set-signature').value, companyDescription: $('#set-company').value },
+}, 'Persona'));
+$('#save-models')?.addEventListener('click', () => saveSettings({
+  reply: { model: $('#set-reply-model').value },
+  classifier: { model: $('#set-classifier-model').value, prompt: $('#set-classifier-prompt').value || null },
+  retrieval: { similarityThreshold: parseFloat($('#set-threshold').value), topK: parseInt($('#set-topk').value, 10) },
+}, 'Models & retrieval'));
+$('#save-classifier-prompt')?.addEventListener('click', () => saveSettings({
+  classifier: { prompt: $('#set-classifier-prompt').value || null },
+}, 'Classifier prompt'));
+$('#save-auto-send')?.addEventListener('click', () => saveSettings({
+  polling: { autoSend: $('#set-auto-send').checked },
+}, 'Auto-send'));
+$('#delete-account')?.addEventListener('click', async () => {
+  if (!confirm('Delete this workspace? Data is soft-deleted now and hard-deleted in 30 days. This cannot be undone after 30 days.')) return;
+  try {
+    await safeFetch('/admin/api/settings/account/delete', { method: 'POST' });
+    window.location.href = '/admin/login';
+  } catch (e) { showError('Delete failed: ' + e.message); }
+});
 
 initRouter();
 loadStatus();

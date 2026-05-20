@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set up · inbox-ai</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --bg: #f8fafc; --card: #ffffff; --border: #e5e7eb; --border-strong: #cbd5e1;
+    --text: #0f172a; --muted: #64748b; --primary: #4f46e5; --primary-hover: #4338ca;
+    --primary-soft: #eef2ff; --success: #16a34a; --success-soft: #dcfce7;
+    --shadow: 0 1px 2px rgba(15,23,42,.04), 0 4px 16px rgba(15,23,42,.04);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; font-size: 14px; }
+  .shell { max-width: 680px; margin: 0 auto; padding: 40px 24px; }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; }
+  .brand-mark { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #4f46e5, #7c3aed); display: grid; place-items: center; color: white; font-weight: 700; font-size: 14px; box-shadow: 0 4px 12px rgba(79,70,229,.3); }
+  .progress { display: flex; gap: 6px; margin-bottom: 28px; }
+  .progress-step { flex: 1; height: 4px; border-radius: 2px; background: var(--border); transition: background .2s; }
+  .progress-step.done { background: var(--success); }
+  .progress-step.current { background: var(--primary); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 32px; box-shadow: var(--shadow); }
+  h1 { margin: 0 0 8px; font-size: 22px; letter-spacing: -.4px; }
+  .sub { margin: 0 0 24px; color: var(--muted); line-height: 1.55; }
+  label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+  input, textarea, select {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border-strong);
+    border-radius: 8px; font: inherit; font-size: 14px; background: white;
+    color: var(--text); margin-bottom: 16px;
+  }
+  textarea { resize: vertical; min-height: 100px; font-family: inherit; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(79,70,229,.15); }
+  .btn { padding: 11px 18px; border-radius: 8px; border: 1px solid var(--border-strong); background: white; color: var(--text); font: inherit; font-weight: 500; font-size: 14px; cursor: pointer; text-decoration: none; display: inline-block; }
+  .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
+  .btn-primary:hover { background: var(--primary-hover); }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .actions { display: flex; gap: 10px; margin-top: 8px; align-items: center; }
+  .err { background: #fee2e2; color: #7f1d1d; border: 1px solid #fca5a5; padding: 10px 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+  .err.show { display: block; }
+  .tone-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+  .tone-chip { padding: 6px 12px; border-radius: 20px; border: 1px solid var(--border-strong); background: white; cursor: pointer; font: inherit; font-size: 13px; }
+  .tone-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+  .file-area { border: 2px dashed var(--border-strong); padding: 32px; border-radius: 10px; text-align: center; background: #fafbfc; cursor: pointer; display: block; }
+  .file-area:hover { background: #f8fafc; border-color: #94a3b8; }
+  .file-area input { display: none; }
+  .uploaded { background: var(--success-soft); color: var(--success); padding: 8px 12px; border-radius: 8px; font-size: 13px; margin-top: 8px; }
+  .skip-link { background: transparent; border: none; color: var(--muted); font: inherit; font-size: 13px; text-decoration: underline; cursor: pointer; padding: 0; }
+  .summary-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-row .check { width: 22px; height: 22px; border-radius: 50%; background: var(--success-soft); color: var(--success); display: grid; place-items: center; flex-shrink: 0; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="brand"><div class="brand-mark">ia</div><span style="font-weight:600">inbox-ai</span></div>
+  <div class="progress">
+    <div class="progress-step" data-step="welcome"></div>
+    <div class="progress-step" data-step="mailbox"></div>
+    <div class="progress-step" data-step="persona"></div>
+    <div class="progress-step" data-step="kb"></div>
+    <div class="progress-step" data-step="classifier"></div>
+    <div class="progress-step" data-step="done"></div>
+  </div>
+
+  <div class="err" id="err"></div>
+
+  <section class="card step" id="step-welcome" style="display:none">
+    <h1>Welcome to inbox-ai</h1>
+    <p class="sub">Tell us what to call this workspace. You can change it later.</p>
+    <label for="name">Workspace name</label>
+    <input id="name" placeholder="Acme Inc." maxlength="80">
+    <div class="actions"><button class="btn btn-primary" id="welcome-next">Continue</button></div>
+  </section>
+
+  <section class="card step" id="step-mailbox" style="display:none">
+    <h1>Connect your Gmail</h1>
+    <p class="sub">The bot polls this mailbox every minute and replies on its behalf. We use Google's official OAuth — your credentials never touch our servers.</p>
+    <div id="mailbox-status" style="margin-bottom:16px"></div>
+    <div class="actions">
+      <a class="btn btn-primary" href="/oauth/start">Connect Gmail</a>
+      <button class="btn" id="mailbox-refresh">I've connected — refresh status</button>
+    </div>
+  </section>
+
+  <section class="card step" id="step-persona" style="display:none">
+    <h1>How should the bot sound?</h1>
+    <p class="sub">These settings shape every reply.</p>
+    <label>Tone</label>
+    <div class="tone-chips" id="tone-chips">
+      <button type="button" class="tone-chip" data-val="professional, warm, concise">Professional</button>
+      <button type="button" class="tone-chip" data-val="friendly, casual, helpful">Friendly</button>
+      <button type="button" class="tone-chip" data-val="formal, precise, direct">Formal</button>
+      <button type="button" class="tone-chip" data-val="playful, enthusiastic, warm">Playful</button>
+    </div>
+    <input id="tone" value="professional, warm, concise">
+
+    <label>Signature</label>
+    <input id="signature" placeholder="— Ayush, Acme Inc." maxlength="200">
+
+    <label>Company / context description</label>
+    <textarea id="companyDescription" placeholder="Acme Inc. helps small businesses ship AI features faster. We offer..." maxlength="1000"></textarea>
+
+    <div class="actions"><button class="btn btn-primary" id="persona-next">Continue</button></div>
+  </section>
+
+  <section class="card step" id="step-kb" style="display:none">
+    <h1>Upload your knowledge base</h1>
+    <p class="sub">Drop one or more PDFs. The bot draws every answer from these documents — it won't make things up. You can add more later.</p>
+    <label class="file-area" for="kb-file">Drop a PDF here, or click to choose<input type="file" id="kb-file" accept="application/pdf" multiple></label>
+    <div id="kb-upload-status"></div>
+    <div class="actions"><button class="btn btn-primary" id="kb-next" disabled>Continue</button></div>
+  </section>
+
+  <section class="card step" id="step-classifier" style="display:none">
+    <h1>Classifier prompt (optional)</h1>
+    <p class="sub">The bot first asks a small LLM: "is this a real customer question?" If you want to tune what counts, edit the prompt below — or skip to keep the smart default.</p>
+    <label>Custom classifier prompt (leave empty for default)</label>
+    <textarea id="classifierPrompt" placeholder="Reply CLIENT_QUERY if the email asks anything about AI tools, automation, our pricing, or our services. Reply OTHER for newsletters, receipts, or empty/test messages. Reply with exactly one word." maxlength="2000"></textarea>
+    <div class="actions">
+      <button class="btn btn-primary" id="classifier-next">Continue</button>
+      <button class="skip-link" id="classifier-skip">Use default</button>
+    </div>
+  </section>
+
+  <section class="card step" id="step-done" style="display:none">
+    <h1>You're ready 🎉</h1>
+    <p class="sub">Here's a summary. The bot will start polling within 60 seconds.</p>
+    <div id="summary"></div>
+    <div class="actions" style="margin-top:24px"><button class="btn btn-primary" id="done-finish">Go to dashboard</button></div>
+  </section>
+</div>
+
+<script>
+async function api(path, opts) {
+  const merged = { ...opts, headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(opts?.headers || {}) } };
+  const r = await fetch(path, merged);
+  if (r.status === 401) { window.location.href = '/admin/login'; throw new Error('401'); }
+  if (!r.ok) { let d=''; try{d=(await r.json()).error||'';}catch{d=await r.text();} throw new Error(`HTTP ${r.status}: ${d}`); }
+  return r.json();
+}
+function showErr(msg) {
+  const el = document.getElementById('err');
+  el.textContent = msg; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 5000);
+}
+function show(stepId) {
+  document.querySelectorAll('.step').forEach(el => el.style.display = el.id === `step-${stepId}` ? 'block' : 'none');
+  document.querySelectorAll('.progress-step').forEach(el => el.classList.remove('current'));
+  document.querySelector(`.progress-step[data-step="${stepId}"]`)?.classList.add('current');
+}
+function markDone(steps) {
+  for (const [name, done] of Object.entries(steps)) {
+    document.querySelector(`.progress-step[data-step="${name}"]`)?.classList.toggle('done', !!done);
+  }
+}
+async function loadState() {
+  const s = await api('/admin/onboarding/api/state');
+  markDone(s.steps);
+  if (s.steps.done) { window.location.href = '/admin'; return; }
+  if (!s.steps.welcome) return show('welcome');
+  if (!s.steps.mailbox) { await refreshMailbox(); return show('mailbox'); }
+  if (!s.steps.persona) return show('persona');
+  if (!s.steps.kb) return show('kb');
+  return show('classifier');
+}
+
+document.getElementById('welcome-next').addEventListener('click', async () => {
+  const name = document.getElementById('name').value.trim();
+  if (!name) { showErr('Enter a workspace name'); return; }
+  try { await api('/admin/onboarding/api/welcome', { method: 'POST', body: JSON.stringify({ name }) }); await loadState(); }
+  catch(e) { showErr(e.message); }
+});
+
+async function refreshMailbox() {
+  const s = await api('/admin/onboarding/api/state');
+  const el = document.getElementById('mailbox-status');
+  if (s.steps.mailbox) {
+    el.innerHTML = `<div class="uploaded">✓ Connected</div>`;
+    setTimeout(() => loadState(), 600);
+  } else {
+    el.innerHTML = `<div style="color:var(--muted);font-size:13px">Not connected yet. Click <strong>Connect Gmail</strong>, complete the Google flow, then return here.</div>`;
+  }
+}
+document.getElementById('mailbox-refresh').addEventListener('click', refreshMailbox);
+
+document.querySelectorAll('.tone-chip').forEach(el => el.addEventListener('click', () => {
+  document.querySelectorAll('.tone-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tone').value = el.dataset.val;
+}));
+document.getElementById('persona-next').addEventListener('click', async () => {
+  const payload = {
+    signature: document.getElementById('signature').value.trim() || '— Sent by your AI assistant',
+    tone: document.getElementById('tone').value.trim() || 'professional, warm, concise',
+    companyDescription: document.getElementById('companyDescription').value.trim(),
+  };
+  if (!payload.companyDescription) { showErr('Add a short company description — the bot uses it to ground replies'); return; }
+  try { await api('/admin/onboarding/api/persona', { method: 'POST', body: JSON.stringify(payload) }); await loadState(); }
+  catch(e) { showErr(e.message); }
+});
+
+const kbFile = document.getElementById('kb-file');
+const kbStatus = document.getElementById('kb-upload-status');
+const kbNext = document.getElementById('kb-next');
+kbFile.addEventListener('change', async () => {
+  for (const file of kbFile.files) {
+    const div = document.createElement('div');
+    div.style.fontSize = '13px'; div.style.padding = '8px 0';
+    div.textContent = `Uploading ${file.name}…`;
+    kbStatus.appendChild(div);
+    const fd = new FormData(); fd.append('file', file);
+    try {
+      const r = await fetch('/admin/api/documents', { method: 'POST', body: fd });
+      if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`);
+      const res = await r.json();
+      div.textContent = `✓ ${file.name} — ${res.chunkCount} chunks ingested`;
+      div.style.color = 'var(--success)';
+      kbNext.disabled = false;
+    } catch (e) {
+      div.textContent = `✗ ${file.name} — ${e.message}`;
+      div.style.color = '#c33';
+    }
+  }
+});
+kbNext.addEventListener('click', () => loadState());
+
+document.getElementById('classifier-next').addEventListener('click', async () => {
+  try {
+    await api('/admin/onboarding/api/classifier', { method: 'POST', body: JSON.stringify({ prompt: document.getElementById('classifierPrompt').value }) });
+    await renderSummaryAndGoDone();
+  } catch (e) { showErr(e.message); }
+});
+document.getElementById('classifier-skip').addEventListener('click', async () => {
+  try {
+    await api('/admin/onboarding/api/classifier', { method: 'POST', body: JSON.stringify({ prompt: '' }) });
+    await renderSummaryAndGoDone();
+  } catch (e) { showErr(e.message); }
+});
+
+async function renderSummaryAndGoDone() {
+  const s = await api('/admin/onboarding/api/state');
+  const sum = document.getElementById('summary');
+  const lines = [
+    { label: `Workspace: ${s.tenant.name}`, ok: true },
+    { label: `Gmail connected`, ok: s.steps.mailbox },
+    { label: `Persona configured`, ok: s.steps.persona },
+    { label: `Knowledge base populated`, ok: s.steps.kb },
+    { label: `Classifier ready`, ok: true },
+  ];
+  sum.innerHTML = lines.map(l => `<div class="summary-row"><span class="check">${l.ok ? '✓' : '·'}</span>${l.label}</div>`).join('');
+  show('done');
+}
+document.getElementById('done-finish').addEventListener('click', async () => {
+  try { await api('/admin/onboarding/api/complete', { method: 'POST' }); window.location.href = '/admin'; }
+  catch(e) { showErr(e.message); }
+});
+
+loadState().catch(e => showErr(e.message));
+if (location.hash === '#mailbox-return') refreshMailbox();
+</script>
+</body>
+</html>

@@ -101,3 +101,49 @@ Edit `.env` and `docker compose up -d` to restart:
 - `TOP_K` — how many chunks to retrieve (default 5).
 - `POLL_INTERVAL_SECONDS` — how often to poll Gmail (default 60).
 - `TONE`, `SIGNATURE`, `COMPANY_DESCRIPTION` — persona.
+
+---
+
+## SaaS-mode deployment notes
+
+inbox-ai is now multi-tenant. A single deployment serves N tenants. Steps that change from the single-tenant guide:
+
+- **No `ADMIN_EMAILS` env var.** Anyone with a Google account can sign in and gets an auto-provisioned tenant.
+- **No tenant-specific persona / model / threshold env vars.** All per-tenant config lives in the `tenants.settings` JSONB column and is edited via the Settings UI. The env-level defaults (`SIMILARITY_THRESHOLD`, `TONE`, `SIGNATURE`, `COMPANY_DESCRIPTION`, etc.) are NO LONGER read by the running pipeline — only `defaultTenantSettings()` in code matters.
+- **Single deployment, single domain.** All tenants share `bot.aiagencycorp.com`. Tenant context is derived from the signed-in user's email.
+- **Pre-add OAuth redirect URI**: `https://bot.aiagencycorp.com/oauth/callback` (just one — used for both sign-in and mailbox-connect flows, disambiguated via `state` param).
+- **Run migration 002** in the Supabase SQL editor before redeploying — see [MIGRATION-002-RUNBOOK.md](MIGRATION-002-RUNBOOK.md).
+- **One Supabase project**, no longer one-per-client. RLS + per-query tenant scoping enforce isolation.
+- **New routes mounted in `server.ts`**: `/admin/api/settings` (settings + usage + delete) and `/admin/onboarding` (wizard).
+- **Daily cleanup cron** hard-deletes soft-deleted tenants after 30 days (runs at 03:00 UTC).
+
+## Per-tenant cost attribution
+
+OpenRouter doesn't support sub-keys. Cost tracking lives in our `llm_usage` table — every `chat()` and `embed()` call records `{tenant_id, model, kind, tokens, cost_usd}`. To query "how much has tenant X spent in the last 30 days":
+
+```sql
+select model, sum(total_tokens) as tokens, sum(cost_usd) as cost
+from llm_usage
+where tenant_id = '<id>'
+  and created_at > now() - interval '30 days'
+group by model
+order by cost desc;
+```
+
+The Settings UI surfaces this per tenant.
+
+## Tenant isolation
+
+Every query that touches a per-tenant table is filtered by `tenant_id` in code. RLS is enabled on every table as defense-in-depth (the app uses the service role key which bypasses RLS, but RLS catches any accidental anon-key access).
+
+`tests/integration/tenant-isolation.test.ts` provisions two tenants, inserts a doc + message in each, and asserts neither tenant sees the other's data. Run against a test Supabase project with `TEST_SUPABASE=1 npm test`.
+
+## OAuth verification
+
+In SaaS mode every new tenant sees Google's "Google hasn't verified this app" warning during sign-in. Submit the OAuth consent screen for verification before any real marketing push:
+1. Privacy policy URL (host on `aiagencycorp.com/privacy`)
+2. Terms of service URL (`aiagencycorp.com/terms`)
+3. Demo video showing data use
+4. Wait ~4-6 weeks for review
+
+Until verification, the workflow still works for users who click "Advanced → Continue" — but conversion at scale will suffer.
