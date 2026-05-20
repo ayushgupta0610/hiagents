@@ -10,36 +10,25 @@ if (existsSync('.env.local')) {
 const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('production'),
+  BASE_URL: z.url(),
 
   // Supabase
   SUPABASE_URL: z.url(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(10),
 
-  // Generation
+  // OpenRouter (used for embeddings, classifier, reply)
   OPENROUTER_API_KEY: z.string().min(10),
-  CLASSIFIER_MODEL: z.string().default('openai/gpt-4o-mini'),
-  CLASSIFIER_PROMPT: z.string().optional(),
-  REPLY_MODEL: z.string().default('deepseek/deepseek-v4-flash'),
 
-  // Gmail OAuth
+  // Google OAuth (shared across all tenants)
   GOOGLE_CLIENT_ID: z.string().min(10),
   GOOGLE_CLIENT_SECRET: z.string().min(10),
   GOOGLE_REDIRECT_URI: z.url(),
-  GMAIL_ADDRESS: z.email(),
 
-  // Admin
+  // Admin (HMAC secret + password fallback login)
   ADMIN_PASSWORD: z.string().min(8),
-  BASE_URL: z.url(),
 
-  // Tuning
-  SIMILARITY_THRESHOLD: z.coerce.number().min(0).max(1).default(0.7),
-  TOP_K: z.coerce.number().int().positive().default(5),
+  // Poller cadence (applies to every tenant)
   POLL_INTERVAL_SECONDS: z.coerce.number().int().positive().default(60),
-
-  // Persona
-  SIGNATURE: z.string().default('— Sent by inbox-ai'),
-  TONE: z.string().default('professional, warm, concise'),
-  COMPANY_DESCRIPTION: z.string().default(''),
 });
 
 export type Env = z.infer<typeof envSchema>;
