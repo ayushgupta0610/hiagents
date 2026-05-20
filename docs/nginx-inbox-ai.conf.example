@@ -1,0 +1,39 @@
+# Example nginx vhost for inbox-ai.
+# Drop into /etc/nginx/sites-available/bot.aiagencycorp.com then:
+#   ln -s /etc/nginx/sites-available/bot.aiagencycorp.com /etc/nginx/sites-enabled/
+#   nginx -t && systemctl reload nginx
+#   certbot --nginx -d bot.aiagencycorp.com   # provisions Let's Encrypt cert
+#
+# For multi-client deploys on the same VPS, copy this file per client,
+# change the server_name and proxy_pass port. e.g.:
+#   bot-acme.aiagencycorp.com -> proxy_pass http://127.0.0.1:3001;
+#   bot-foo.aiagencycorp.com  -> proxy_pass http://127.0.0.1:3002;
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name bot.aiagencycorp.com;
+
+    # certbot will rewrite this section after issuing the certificate
+    # to add the SSL listener + redirect block.
+
+    # Upload size cap (matches multer 25MB limit in the app)
+    client_max_body_size 30M;
+
+    # PDF ingest pipeline can take 30-90s for large PDFs.
+    # Bump proxy timeouts so long uploads don't get cut off.
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_cache_bypass $http_upgrade;
+    }
+}
