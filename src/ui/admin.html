@@ -10,80 +10,72 @@
   section { margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; }
   table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
   th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; vertical-align: top; }
-  .drop { border: 2px dashed #ccc; padding: 40px; text-align: center; border-radius: 8px; color: #888; }
+  .drop { border: 2px dashed #ccc; padding: 40px; text-align: center; border-radius: 8px; color: #888; transition: border-color 0.15s, color 0.15s; }
   .drop.hover { border-color: #2a7; color: #2a7; }
+  .drop.uploading { border-color: #b88; color: #b88; }
   button { padding: 6px 12px; cursor: pointer; }
+  button.del { color: #c33; background: #fff; border: 1px solid #ddd; border-radius: 4px; }
+  button.del:hover { background: #fde0e0; }
   .pill { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; }
-  .pill-sent { background: #e0f5e0; color: #2a7; }
-  .pill-skipped { background: #f0f0f0; color: #666; }
+  .pill-sent, .pill-ingested { background: #e0f5e0; color: #2a7; }
+  .pill-skipped, .pill-pending { background: #fff5cc; color: #875; }
   .pill-failed { background: #fde0e0; color: #c33; }
+  .banner { padding: 12px 16px; border-radius: 6px; margin: 12px 0; font-size: 14px; display: none; }
+  .banner.show { display: block; }
+  .banner-error { background: #fde0e0; color: #802020; border: 1px solid #f5b5b5; }
+  .banner-info { background: #e0f0fd; color: #204060; border: 1px solid #b5d5f5; }
+  .banner-success { background: #e0f5e0; color: #2a7; border: 1px solid #b5e5b5; }
+  .banner .close { float: right; background: none; border: none; font-size: 18px; line-height: 14px; cursor: pointer; color: inherit; padding: 0; margin-left: 12px; }
+  small { color: #666; }
+  .empty { color: #999; font-style: italic; padding: 12px 8px; }
+  .upload-list { margin-top: 12px; }
+  .upload-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; font-size: 13px; border-bottom: 1px solid #f0f0f0; }
+  .upload-row .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .upload-row .state { font-size: 12px; }
+  .upload-row.success { color: #2a7; }
+  .upload-row.error { color: #c33; }
+  .upload-row.error .err { font-size: 12px; opacity: 0.8; }
 </style>
 </head>
 <body>
 <h1>inbox-ai</h1>
 <p class="sub">Admin dashboard</p>
 
+<div id="global-error" class="banner banner-error"><button class="close" onclick="this.parentElement.classList.remove('show')">×</button><span></span></div>
+
 <section>
   <h2>Gmail connection</h2>
-  <div id="status">Loading...</div>
-  <p><a href="/oauth/start">Connect / reconnect Gmail</a></p>
+  <div id="status">Loading…</div>
+  <p style="margin-top:12px"><a href="/oauth/start">Connect / reconnect Gmail</a></p>
 </section>
 
 <section>
   <h2>Knowledge base</h2>
-  <div id="drop" class="drop">Drag a PDF here, or <input type="file" id="file" accept="application/pdf"></div>
+  <div id="drop" class="drop">Drag a PDF here, or <input type="file" id="file" accept="application/pdf" multiple></div>
+  <div id="upload-list" class="upload-list"></div>
   <table id="docs"><thead><tr><th>File</th><th>Status</th><th>Chunks</th><th>Uploaded</th><th></th></tr></thead><tbody></tbody></table>
 </section>
 
 <section>
   <h2>Recent activity</h2>
+  <p class="sub" style="font-size:13px">Auto-refreshes every 30s. Shows the latest 100 emails processed by the bot.</p>
   <table id="msgs"><thead><tr><th>Received</th><th>From</th><th>Subject</th><th>Class</th><th>Reply</th></tr></thead><tbody></tbody></table>
 </section>
 
 <script>
-async function loadStatus() {
-  const r = await fetch('/admin/api/status');
-  const data = await r.json();
-  document.getElementById('status').textContent = data.gmail
-    ? `Connected: ${data.gmail.email} (updated ${new Date(data.gmail.updated_at).toLocaleString()})`
-    : 'Not connected. Click below to authorize Gmail.';
-}
-
-async function loadDocs() {
-  const r = await fetch('/admin/api/documents');
-  const docs = await r.json();
-  const tbody = document.querySelector('#docs tbody');
-  tbody.innerHTML = '';
-  for (const d of docs) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${escapeHtml(d.filename)}</td>
-      <td>${d.status}${d.error ? `<br><small>${escapeHtml(d.error)}</small>` : ''}</td>
-      <td>${d.chunk_count ?? '-'}</td>
-      <td>${new Date(d.uploaded_at).toLocaleString()}</td>
-      <td><button data-id="${d.id}" class="del">Delete</button></td>`;
-    tbody.appendChild(tr);
-  }
-  tbody.querySelectorAll('button.del').forEach((b) => b.addEventListener('click', async () => {
-    if (!confirm('Delete this document and its chunks?')) return;
-    await fetch('/admin/api/documents/' + b.dataset.id, { method: 'DELETE' });
-    loadDocs();
-  }));
-}
-
-async function loadMsgs() {
-  const r = await fetch('/admin/api/messages');
-  const msgs = await r.json();
-  const tbody = document.querySelector('#msgs tbody');
-  tbody.innerHTML = '';
-  for (const m of msgs) {
-    const tr = document.createElement('tr');
-    const pillClass = m.reply_status === 'sent' ? 'pill-sent' : m.reply_status === 'failed' ? 'pill-failed' : 'pill-skipped';
-    tr.innerHTML = `<td>${new Date(m.received_at).toLocaleString()}</td>
-      <td>${escapeHtml(m.from_address)}</td>
-      <td>${escapeHtml(m.subject || '')}</td>
-      <td>${m.classification || ''}</td>
-      <td><span class="pill ${pillClass}">${m.reply_status || ''}</span>${m.reply_reason ? `<br><small>${escapeHtml(m.reply_reason)}</small>` : ''}</td>`;
-    tbody.appendChild(tr);
+// Defensive: unregister any service worker left over from another app on localhost.
+// inbox-ai never registers a SW, so anything alive here was registered by a
+// previous project on this origin and will silently intercept our fetches.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    if (regs.length > 0) {
+      console.warn('[inbox-ai] Unregistering', regs.length, 'leftover service worker(s) from this origin');
+      regs.forEach((r) => r.unregister());
+    }
+  }).catch(() => {});
+  // Also clear any caches the SW left behind
+  if ('caches' in window) {
+    caches.keys().then((keys) => keys.forEach((k) => caches.delete(k))).catch(() => {});
   }
 }
 
@@ -91,35 +83,182 @@ function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+function showGlobalError(msg) {
+  const el = document.getElementById('global-error');
+  el.querySelector('span').textContent = msg;
+  el.classList.add('show');
+}
+
+async function safeFetch(url, opts) {
+  const merged = { ...opts, headers: { Accept: 'application/json', ...(opts?.headers || {}) } };
+  let res;
+  try {
+    res = await fetch(url, merged);
+  } catch (err) {
+    throw new Error(`Network error talking to ${url}: ${err.message || err}`);
+  }
+  if (res.status === 401) {
+    // Session expired or never authed — bounce to login.
+    window.location.href = '/admin/login';
+    throw new Error('Session expired — redirecting to login');
+  }
+  if (!res.ok) {
+    let detail = '';
+    try { detail = (await res.json()).error || ''; } catch { detail = await res.text().catch(() => ''); }
+    throw new Error(`${opts?.method || 'GET'} ${url} failed (HTTP ${res.status})${detail ? ': ' + detail : ''}`);
+  }
+  return res.json();
+}
+
+async function loadStatus() {
+  const el = document.getElementById('status');
+  try {
+    const data = await safeFetch('/admin/api/status');
+    if (data.gmail) {
+      el.innerHTML = `<span class="pill pill-ingested">Connected</span> ${escapeHtml(data.gmail.email)} <small>(updated ${new Date(data.gmail.updated_at).toLocaleString()})</small>`;
+    } else {
+      el.innerHTML = `<span class="pill pill-failed">Not connected</span> Click the link below to authorize Gmail. The bot will not poll or reply until this is set up.`;
+    }
+  } catch (err) {
+    el.innerHTML = `<span class="pill pill-failed">Error</span> ${escapeHtml(err.message)}`;
+  }
+}
+
+async function loadDocs() {
+  const tbody = document.querySelector('#docs tbody');
+  try {
+    const docs = await safeFetch('/admin/api/documents');
+    tbody.innerHTML = '';
+    if (docs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="empty">No documents yet — drop a PDF above to add to the knowledge base.</td></tr>`;
+      return false;
+    }
+    let anyPending = false;
+    for (const d of docs) {
+      if (d.status === 'pending') anyPending = true;
+      const statusHtml = `<span class="pill pill-${d.status}">${d.status}</span>` + (d.error ? `<br><small>${escapeHtml(d.error)}</small>` : '');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${escapeHtml(d.filename)}</td>
+        <td>${statusHtml}</td>
+        <td>${d.chunk_count ?? '—'}</td>
+        <td><small>${new Date(d.uploaded_at).toLocaleString()}</small></td>
+        <td><button data-id="${d.id}" class="del">Delete</button></td>`;
+      tbody.appendChild(tr);
+    }
+    tbody.querySelectorAll('button.del').forEach((b) => b.addEventListener('click', () => deleteDoc(b.dataset.id)));
+    return anyPending;
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5"><span class="pill pill-failed">Error</span> ${escapeHtml(err.message)}</td></tr>`;
+    return false;
+  }
+}
+
+async function deleteDoc(id) {
+  if (!confirm('Delete this document and its chunks?')) return;
+  try {
+    await safeFetch('/admin/api/documents/' + id, { method: 'DELETE' });
+    loadDocs();
+  } catch (err) {
+    showGlobalError('Failed to delete document: ' + err.message);
+  }
+}
+
+async function loadMsgs() {
+  const tbody = document.querySelector('#msgs tbody');
+  try {
+    const msgs = await safeFetch('/admin/api/messages');
+    tbody.innerHTML = '';
+    if (msgs.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="empty">No emails processed yet. The bot polls Gmail every ${30} seconds (locally) — once you connect Gmail and an email arrives, you'll see it here.</td></tr>`;
+      return;
+    }
+    for (const m of msgs) {
+      const pillClass = m.reply_status === 'sent' ? 'pill-sent' : m.reply_status === 'failed' ? 'pill-failed' : 'pill-skipped';
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td><small>${new Date(m.received_at).toLocaleString()}</small></td>
+        <td>${escapeHtml(m.from_address)}</td>
+        <td>${escapeHtml(m.subject || '')}</td>
+        <td>${m.classification || ''}</td>
+        <td><span class="pill ${pillClass}">${m.reply_status || ''}</span>${m.reply_reason ? `<br><small>${escapeHtml(m.reply_reason)}</small>` : ''}</td>`;
+      tbody.appendChild(tr);
+    }
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="5"><span class="pill pill-failed">Error</span> ${escapeHtml(err.message)}</td></tr>`;
+  }
+}
+
 const drop = document.getElementById('drop');
 const fileInput = document.getElementById('file');
+const uploadList = document.getElementById('upload-list');
+
 ['dragover', 'dragenter'].forEach((e) => drop.addEventListener(e, (ev) => { ev.preventDefault(); drop.classList.add('hover'); }));
 ['dragleave', 'drop'].forEach((e) => drop.addEventListener(e, () => drop.classList.remove('hover')));
+
 drop.addEventListener('drop', async (ev) => {
   ev.preventDefault();
-  for (const f of ev.dataTransfer.files) await uploadFile(f);
-  loadDocs();
+  await uploadAll(Array.from(ev.dataTransfer.files));
 });
 fileInput.addEventListener('change', async () => {
-  for (const f of fileInput.files) await uploadFile(f);
+  await uploadAll(Array.from(fileInput.files));
   fileInput.value = '';
-  loadDocs();
 });
 
+async function uploadAll(files) {
+  if (files.length === 0) return;
+  drop.classList.add('uploading');
+  try {
+    for (const f of files) await uploadFile(f);
+  } finally {
+    drop.classList.remove('uploading');
+    loadDocs();
+  }
+}
+
 async function uploadFile(file) {
+  const row = document.createElement('div');
+  row.className = 'upload-row';
+  row.innerHTML = `<span class="name">${escapeHtml(file.name)}</span><span class="state">uploading…</span>`;
+  uploadList.appendChild(row);
+
+  if (!file.name.toLowerCase().endsWith('.pdf')) {
+    row.classList.add('error');
+    row.querySelector('.state').innerHTML = `<span class="err">not a PDF — skipped</span>`;
+    return;
+  }
+  if (file.size > 25 * 1024 * 1024) {
+    row.classList.add('error');
+    row.querySelector('.state').innerHTML = `<span class="err">file too large (${(file.size / 1024 / 1024).toFixed(1)} MB > 25 MB limit)</span>`;
+    return;
+  }
+
   const fd = new FormData();
   fd.append('file', file);
-  const r = await fetch('/admin/api/documents', { method: 'POST', body: fd });
-  if (!r.ok) {
-    const err = await r.json().catch(() => ({}));
-    alert('Upload failed: ' + (err.error || r.status));
+  try {
+    const result = await safeFetch('/admin/api/documents', { method: 'POST', body: fd });
+    row.classList.add('success');
+    row.querySelector('.state').textContent = `ingested — ${result.chunkCount} chunks`;
+  } catch (err) {
+    row.classList.add('error');
+    row.querySelector('.state').innerHTML = `<span class="err">${escapeHtml(err.message)}</span>`;
+  }
+}
+
+let pollHandle = null;
+async function refreshDocs() {
+  const anyPending = await loadDocs();
+  if (anyPending && !pollHandle) {
+    pollHandle = setInterval(async () => {
+      const stillPending = await loadDocs();
+      if (!stillPending) { clearInterval(pollHandle); pollHandle = null; }
+    }, 3000);
   }
 }
 
 loadStatus();
-loadDocs();
+refreshDocs();
 loadMsgs();
 setInterval(loadMsgs, 30000);
+setInterval(loadStatus, 60000);
 </script>
 </body>
 </html>

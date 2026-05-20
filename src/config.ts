@@ -1,7 +1,11 @@
 import { config as loadEnv } from 'dotenv';
+import { existsSync } from 'node:fs';
 import { z } from 'zod';
 
 loadEnv();
+if (existsSync('.env.local')) {
+  loadEnv({ path: '.env.local', override: true });
+}
 
 const envSchema = z.object({
   PORT: z.coerce.number().default(3000),
@@ -14,6 +18,7 @@ const envSchema = z.object({
   // Generation
   OPENROUTER_API_KEY: z.string().min(10),
   CLASSIFIER_MODEL: z.string().default('openai/gpt-4o-mini'),
+  CLASSIFIER_PROMPT: z.string().optional(),
   REPLY_MODEL: z.string().default('deepseek/deepseek-v4-flash'),
 
   // Gmail OAuth

@@ -6,10 +6,22 @@ export interface ClassifierInput {
   bodyText: string;
 }
 
-const SYSTEM_PROMPT = `You classify whether an incoming email is a client/customer query that an AI agency should respond to, or something else (newsletter, automated notification, internal team message, spam, personal mail).
+export const DEFAULT_CLASSIFIER_PROMPT = `You classify whether an incoming email contains a genuine question worth answering from a knowledge base, or something else (newsletter, automated notification, no-question chatter, spam).
 
-Match (CLIENT_QUERY): questions about services, pricing, demo requests, support questions, project inquiries, follow-ups from prospects.
-Skip (OTHER): newsletters, marketing blasts, transactional/receipt emails, automated notifications, internal team chatter, personal mail not related to business.
+Reply CLIENT_QUERY if the email contains ANY of:
+- A direct question (what, how, when, why, can you, could you, do you, please tell me)
+- A request for information about a topic, product, command, feature, or capability
+- An inquiry about pricing, services, demos, or how something works
+- A follow-up to a prior conversation that includes a question
+
+Reply OTHER only if the email is clearly:
+- A newsletter, marketing blast, or promotional content
+- An automated transactional notification (receipts, order confirmations, deploy alerts)
+- A no-content message with no question at all (e.g., "ok", "thanks", "got it")
+- Spam or unsolicited mail
+- An automated reply / out-of-office message
+
+When in doubt, lean CLIENT_QUERY. False positives (replying to a non-question) are cheaper than false negatives (missing a real customer or test).
 
 Reply with exactly one word: CLIENT_QUERY or OTHER. No punctuation, no explanation.`;
 
@@ -31,13 +43,14 @@ export async function classifyWith(
 export async function classify(input: ClassifierInput): Promise<ClassifierVerdict> {
   const { env } = await import('../config.js');
   const { chat } = await import('../providers/openrouter.js');
+  const systemPrompt = env.CLASSIFIER_PROMPT?.trim() || DEFAULT_CLASSIFIER_PROMPT;
   return classifyWith(async (userPrompt) => {
     return await chat({
       model: env.CLASSIFIER_MODEL,
       temperature: 0,
       maxTokens: 5,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
     });

@@ -41,8 +41,10 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
     next();
     return;
   }
-  if (req.accepts(['html', 'json']) === 'json') {
-    res.status(401).json({ error: 'unauthorized' });
+  // API routes always return 401 JSON so client-side fetch() can detect and
+  // redirect to the login page. Page routes redirect to /admin/login directly.
+  if (req.path.startsWith('/api/') || req.xhr) {
+    res.status(401).json({ error: 'unauthorized', loginUrl: '/admin/login' });
   } else {
     res.redirect('/admin/login');
   }

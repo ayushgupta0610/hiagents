@@ -21,6 +21,12 @@ const loginLimiter = rateLimit({
 
 export const adminRouter: Router = Router();
 
+// Prevent any browser/proxy/service-worker caching of API responses
+adminRouter.use('/api', (_req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+  next();
+});
+
 adminRouter.get('/login', (_req, res) => {
   res.type('html').send(`<!doctype html><html><body style="font-family:sans-serif;padding:40px;max-width:400px;margin:auto">
     <h2>inbox-ai admin</h2>
