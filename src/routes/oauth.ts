@@ -11,6 +11,7 @@ import { requireAdmin, issueSessionForEmail } from '../lib/auth.js';
 import { findTenantForEmail, provisionTenant } from '../tenant/store.js';
 import { audit } from '../tenant/audit.js';
 import { logger } from '../lib/logger.js';
+import { db } from '../db/client.js';
 
 export const oauthRouter: Router = Router();
 
@@ -114,12 +115,16 @@ oauthRouter.get('/callback', async (req, res) => {
       );
       await audit(stateTenantId, email, 'gmail.connected', {});
       logger.info({ email, tenantId: stateTenantId }, 'gmail mailbox connected');
-      const safeEmail = escapeHtml(email);
-      res
-        .type('html')
-        .send(
-          `<div style="font-family:system-ui;padding:40px;max-width:520px;margin:60px auto;background:#fff;border:1px solid #86efac;border-radius:12px"><h2 style="margin-top:0;color:#16a34a">Gmail connected</h2><p style="color:#444">The bot will poll <strong>${safeEmail}</strong> and reply to client queries.</p><p><a href="/admin/onboarding#mailbox-return" style="color:#4f46e5;font-weight:500">Continue setup →</a></p></div>`,
-        );
+
+      // Look up the tenant's onboarding state so we know where to send them.
+      const { data: tenantRow } = await db()
+        .from('tenants')
+        .select('onboarding_completed_at')
+        .eq('id', stateTenantId)
+        .maybeSingle();
+      const onboarded = !!(tenantRow as { onboarding_completed_at: string | null } | null)
+        ?.onboarding_completed_at;
+      res.redirect(onboarded ? '/admin#settings' : '/admin/onboarding#mailbox-return');
       return;
     }
 

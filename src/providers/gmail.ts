@@ -34,7 +34,10 @@ export function buildMailboxAuthUrl(tenantId: string): string {
   const client = getOAuthClient();
   return client.generateAuthUrl({
     access_type: 'offline',
-    prompt: 'consent',
+    // 'select_account consent' forces both the account picker (so users can
+    // pick a different Gmail when reconnecting) AND the consent screen (so
+    // Google reliably returns a refresh_token).
+    prompt: 'select_account consent',
     scope: MAILBOX_SCOPES,
     state: `mailbox:${tenantId}`,
   });

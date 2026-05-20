@@ -106,6 +106,7 @@
     <p class="sub">The bot polls this mailbox every minute and replies on its behalf. We use Google's official OAuth — your credentials never touch our servers.</p>
     <div id="mailbox-status" style="margin-bottom:16px"></div>
     <div class="actions">
+      <button type="button" class="btn" data-back="welcome">← Back</button>
       <a class="btn btn-primary" href="/oauth/start">Connect Gmail</a>
       <button class="btn" id="mailbox-refresh">I've connected — refresh status</button>
     </div>
@@ -129,7 +130,10 @@
     <label>Company / context description</label>
     <textarea id="companyDescription" placeholder="Acme Inc. helps small businesses ship AI features faster. We offer..." maxlength="1000"></textarea>
 
-    <div class="actions"><button class="btn btn-primary" id="persona-next">Continue</button></div>
+    <div class="actions">
+      <button type="button" class="btn" data-back="mailbox">← Back</button>
+      <button class="btn btn-primary" id="persona-next">Continue</button>
+    </div>
   </section>
 
   <section class="card step" id="step-kb" style="display:none">
@@ -137,7 +141,10 @@
     <p class="sub">Drop one or more PDFs. The bot draws every answer from these documents — it won't make things up. You can add more later.</p>
     <label class="file-area" for="kb-file">Drop a PDF here, or click to choose<input type="file" id="kb-file" accept="application/pdf" multiple></label>
     <div id="kb-upload-status"></div>
-    <div class="actions"><button class="btn btn-primary" id="kb-next" disabled>Continue</button></div>
+    <div class="actions">
+      <button type="button" class="btn" data-back="persona">← Back</button>
+      <button class="btn btn-primary" id="kb-next" disabled>Continue</button>
+    </div>
   </section>
 
   <section class="card step" id="step-classifier" style="display:none">
@@ -146,6 +153,7 @@
     <label>Custom classifier prompt (leave empty for default)</label>
     <textarea id="classifierPrompt" placeholder="Reply CLIENT_QUERY if the email asks anything about AI tools, automation, our pricing, or our services. Reply OTHER for newsletters, receipts, or empty/test messages. Reply with exactly one word." maxlength="2000"></textarea>
     <div class="actions">
+      <button type="button" class="btn" data-back="kb">← Back</button>
       <button class="btn btn-primary" id="classifier-next">Continue</button>
       <button class="skip-link" id="classifier-skip">Use default</button>
     </div>
@@ -155,7 +163,10 @@
     <h1>You're ready 🎉</h1>
     <p class="sub">Here's a summary. The bot will start polling within 60 seconds.</p>
     <div id="summary"></div>
-    <div class="actions" style="margin-top:24px"><button class="btn btn-primary" id="done-finish">Go to dashboard</button></div>
+    <div class="actions" style="margin-top:24px">
+      <button type="button" class="btn" data-back="classifier">← Back</button>
+      <button class="btn btn-primary" id="done-finish">Go to dashboard</button>
+    </div>
   </section>
 </div>
 
@@ -287,6 +298,11 @@ async function renderSummaryAndGoDone() {
 document.getElementById('done-finish').addEventListener('click', async () => {
   try { await api('/admin/onboarding/api/complete', { method: 'POST' }); window.location.href = '/admin'; }
   catch(e) { showErr(e.message); }
+});
+
+// Wire Back buttons — each carries data-back="<prev-step>"
+document.querySelectorAll('[data-back]').forEach((btn) => {
+  btn.addEventListener('click', () => show(btn.dataset.back));
 });
 
 loadState().catch(e => showErr(e.message));
