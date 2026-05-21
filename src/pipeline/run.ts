@@ -1,11 +1,18 @@
 import { db } from '../db/client.js';
 import { logger } from '../lib/logger.js';
-import { assertEmailQuota, LimitExceededError } from '../tenant/limits.js';
+import {
+  assertEmailQuota,
+  assertPerSenderReplyQuota,
+  assertDailySpendCap,
+  LimitExceededError,
+} from '../tenant/limits.js';
 import type { Tenant } from '../tenant/store.js';
 import type { IncomingEmail, Classification, ReplyStatus } from '../types.js';
-import { isAutoOrBulk } from './loop-guard.js';
+import { isAutoOrBulk, isSystemSender } from './loop-guard.js';
 import { loadBotSentIdsForThread, ownerHasReplied } from './thread-guard.js';
 import { classify } from './classifier.js';
+import { assessInboundRisk } from './risk.js';
+import { moderateOutbound } from './moderate.js';
 import { search } from '../kb/search.js';
 import { generateReply } from './generate.js';
 import { fetchThreadMessages, sendReply, type SendReplyInput } from '../providers/gmail.js';
@@ -79,6 +86,16 @@ export async function runPipeline(ctx: RunContext, email: IncomingEmail): Promis
     return { classification: 'skipped_self', replyStatus: 'skipped' };
   }
 
+  if (isSystemSender(email.from)) {
+    await supabase.from('messages').insert({
+      ...baseRow,
+      classification: 'skipped_loop',
+      reply_status: 'skipped',
+      reply_reason: 'system-sender (mailer-daemon / noreply / etc.)',
+    });
+    return { classification: 'skipped_loop', replyStatus: 'skipped' };
+  }
+
   if (isAutoOrBulk(email.headers)) {
     await supabase.from('messages').insert({
       ...baseRow,
@@ -87,6 +104,39 @@ export async function runPipeline(ctx: RunContext, email: IncomingEmail): Promis
       reply_reason: 'auto-or-bulk-headers',
     });
     return { classification: 'skipped_loop', replyStatus: 'skipped' };
+  }
+
+  // Per-sender daily reply cap — abuse / spam-back protection
+  try {
+    await assertPerSenderReplyQuota(tenantId, settings, email.from);
+  } catch (err) {
+    if (err instanceof LimitExceededError) {
+      await supabase.from('messages').insert({
+        ...baseRow,
+        classification: 'skipped_loop',
+        reply_status: 'skipped',
+        reply_reason: err.message,
+      });
+      return { classification: 'skipped_loop', replyStatus: 'skipped', replyReason: err.code };
+    }
+    throw err;
+  }
+
+  // Per-tenant daily LLM spend cap — protects the shared OpenRouter key
+  try {
+    await assertDailySpendCap(tenantId, settings);
+  } catch (err) {
+    if (err instanceof LimitExceededError) {
+      logger.warn({ tenantId, code: err.code }, 'daily spend cap hit');
+      await supabase.from('messages').insert({
+        ...baseRow,
+        classification: 'error',
+        reply_status: 'failed',
+        reply_reason: err.message,
+      });
+      return { classification: 'error', replyStatus: 'failed', replyReason: err.code };
+    }
+    throw err;
   }
 
   const botSentIds = await loadBotSentIdsForThread(tenantId, email.gmailThreadId);
@@ -117,6 +167,32 @@ export async function runPipeline(ctx: RunContext, email: IncomingEmail): Promis
       return { classification: 'other', replyStatus: 'skipped' };
     }
 
+    // Inbound risk gate — never auto-reply to threats, prompt-injection,
+    // abuse, fraud patterns, or legal language. Operator sees these in
+    // Activity as 'skipped' with reply_reason explaining why.
+    const risk = await assessInboundRisk(tenantId, settings, {
+      from: email.from,
+      subject: email.subject,
+      bodyText: email.bodyText,
+    });
+    if (risk.verdict === 'unsafe') {
+      logger.warn(
+        { tenantId, id: email.gmailMessageId, reason: risk.reason },
+        'inbound flagged unsafe — no auto-reply',
+      );
+      await supabase.from('messages').insert({
+        ...baseRow,
+        classification: 'skipped_loop',
+        reply_status: 'skipped',
+        reply_reason: `risk-flag: ${risk.reason}`,
+      });
+      return {
+        classification: 'skipped_loop',
+        replyStatus: 'skipped',
+        replyReason: 'risk-flag',
+      };
+    }
+
     const query = `${email.subject}\n\n${email.bodyText}`;
     const chunks = await search(tenantId, settings, query);
     const topSim = chunks[0]?.similarity ?? 0;
@@ -133,6 +209,31 @@ export async function runPipeline(ctx: RunContext, email: IncomingEmail): Promis
     }
 
     const replyText = await generateReply({ tenantId, settings, email, chunks });
+
+    // Outbound moderation gate — last check before sending. Refuses to
+    // ship toxic, legally-risky, or PII-leaking content even if the LLM
+    // generated it confidently.
+    const moderation = await moderateOutbound(tenantId, settings, replyText);
+    if (moderation.verdict === 'flagged') {
+      logger.warn(
+        { tenantId, id: email.gmailMessageId, reason: moderation.reason },
+        'outbound reply flagged by moderation — not sending',
+      );
+      await supabase.from('messages').insert({
+        ...baseRow,
+        classification: 'client_query',
+        retrieved_chunk_ids: chunks.map((c) => c.id),
+        top_similarity: topSim,
+        reply_text: replyText,
+        reply_status: 'failed',
+        reply_reason: `content-flagged: ${moderation.reason}`,
+      });
+      return {
+        classification: 'client_query',
+        replyStatus: 'failed',
+        replyReason: 'content-flagged',
+      };
+    }
 
     if (!settings.polling.autoSend) {
       await supabase.from('messages').insert({

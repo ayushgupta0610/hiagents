@@ -4,7 +4,7 @@ import { logger } from '../lib/logger.js';
 const PRICING: Record<string, { input: number; output: number }> = {
   'openai/text-embedding-3-small': { input: 0.02, output: 0 },
   'openai/gpt-4o-mini': { input: 0.15, output: 0.6 },
-  'google/gemini-2.5-flash': { input: 0.075, output: 0.3 },
+  'google/gemini-3.5-flash': { input: 0.075, output: 0.3 },
   'deepseek/deepseek-v4-flash': { input: 0.112, output: 0.224 },
   'anthropic/claude-haiku-4.5': { input: 1, output: 5 },
   'anthropic/claude-sonnet-4.5': { input: 3, output: 15 },

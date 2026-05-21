@@ -311,7 +311,7 @@ git commit -m "feat(db): multi-tenant schema with backfill into default tenant"
 // Curated list of allowed reply models (prevents tenants from picking expensive Opus etc.)
 export const ALLOWED_REPLY_MODELS = [
   'deepseek/deepseek-v4-flash',
-  'google/gemini-2.5-flash',
+  'google/gemini-3.5-flash',
   'anthropic/claude-haiku-4.5',
   'anthropic/claude-sonnet-4.5',
   'openai/gpt-4o-mini',
@@ -319,7 +319,7 @@ export const ALLOWED_REPLY_MODELS = [
 
 export const ALLOWED_CLASSIFIER_MODELS = [
   'openai/gpt-4o-mini',
-  'google/gemini-2.5-flash',
+  'google/gemini-3.5-flash',
   'anthropic/claude-haiku-4.5',
   'deepseek/deepseek-v4-flash',
 ] as const;
@@ -878,7 +878,7 @@ import { logger } from '../lib/logger.js';
 const PRICING: Record<string, { input: number; output: number }> = {
   'openai/text-embedding-3-small': { input: 0.02, output: 0 },
   'openai/gpt-4o-mini': { input: 0.15, output: 0.6 },
-  'google/gemini-2.5-flash': { input: 0.075, output: 0.3 },
+  'google/gemini-3.5-flash': { input: 0.075, output: 0.3 },
   'deepseek/deepseek-v4-flash': { input: 0.112, output: 0.224 },
   'anthropic/claude-haiku-4.5': { input: 1, output: 5 },
   'anthropic/claude-sonnet-4.5': { input: 3, output: 15 },

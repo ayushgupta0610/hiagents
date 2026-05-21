@@ -43,8 +43,10 @@ export interface TenantSettings {
   };
   limits: {
     dailyEmailCap: number;       // max emails the bot processes per UTC day
+    perSenderDailyReplyCap: number; // max bot replies to one sender per UTC day
     totalChunkCap: number;       // max chunks across all documents
     maxPdfBytes: number;
+    dailySpendCapUsd: number;    // max USD of LLM spend per UTC day before bot pauses
   };
 }
 
@@ -73,8 +75,10 @@ export function defaultTenantSettings(): TenantSettings {
     },
     limits: {
       dailyEmailCap: 200,
+      perSenderDailyReplyCap: 5,
       totalChunkCap: 5000,
       maxPdfBytes: 25 * 1024 * 1024,
+      dailySpendCapUsd: 5,
     },
   };
 }

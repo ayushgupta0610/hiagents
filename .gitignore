@@ -9,3 +9,4 @@ coverage/
 .DS_Store
 tests/fixtures/secrets/
 /tmp/
+.gstack/

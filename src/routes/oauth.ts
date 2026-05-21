@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 import { google } from 'googleapis';
 import {
   MAILBOX_SCOPES,
@@ -37,8 +38,20 @@ oauthRouter.get('/start', requireAdmin, (_req, res) => {
   res.redirect(buildMailboxAuthUrl(tenantId));
 });
 
+// Anti-abuse: 5 signin starts per IP per hour. Stops bots from creating
+// throwaway tenants en masse, which would each burn the shared OpenRouter
+// key on classifier + risk calls before being caught by the spend cap.
+const signinLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message:
+    'Too many sign-in attempts from this IP. Try again in an hour or contact support if this is a mistake.',
+});
+
 // Admin sign-in flow — public, auto-provisions a tenant on first signin
-oauthRouter.get('/signin', (_req, res) => {
+oauthRouter.get('/signin', signinLimiter, (_req, res) => {
   res.redirect(buildSigninAuthUrl());
 });
 
