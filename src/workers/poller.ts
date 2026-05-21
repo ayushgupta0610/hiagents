@@ -76,6 +76,10 @@ async function tick(): Promise<void> {
     for (const t of tenants) {
       const owner = ownerByTenant.get(t.id);
       if (!owner) continue;
+      if (t.settings.polling.paused) {
+        logger.debug({ tenantId: t.id }, 'tenant paused — skipping');
+        continue;
+      }
       try {
         await processTenant(t, owner);
       } catch (err) {

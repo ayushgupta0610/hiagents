@@ -186,6 +186,7 @@ adminRouter.get('/api/status', requireAdmin, async (req, res) => {
           name: tenant.name,
           slug: tenant.slug,
           onboardingCompletedAt: tenant.onboardingCompletedAt,
+          paused: tenant.settings.polling.paused,
         }
       : null,
   });

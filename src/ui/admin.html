@@ -171,6 +171,50 @@
     transition: background 0.15s, color 0.15s;
   }
   .signout-btn:hover { background: var(--neutral-soft); color: var(--text); }
+  .pause-btn {
+    width: 100%;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    background: var(--warning-soft);
+    border: 1px solid #fcd34d;
+    color: #78350f;
+    padding: 8px 10px;
+    border-radius: 6px;
+    font: inherit; font-size: 13px; font-weight: 500;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .pause-btn:hover { background: #fde68a; }
+  .pause-btn.paused {
+    background: var(--success-soft);
+    border-color: #86efac;
+    color: var(--success);
+  }
+  .pause-btn.paused:hover { background: #bbf7d0; }
+  .paused-banner {
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    color: #78350f;
+    padding: 12px 16px;
+    border-radius: 10px;
+    margin-bottom: 16px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+  }
+  .paused-banner.show { display: flex; }
+  .paused-banner strong { color: #78350f; }
+  .paused-banner button {
+    margin-left: auto;
+    background: white;
+    border: 1px solid #fcd34d;
+    color: #78350f;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font: inherit; font-size: 13px; font-weight: 500;
+    cursor: pointer;
+  }
+  .paused-banner button:hover { background: #fde68a; }
 
   /* Mobile header (hidden on desktop) */
   .mobile-header { display: none; }
@@ -461,6 +505,58 @@
     cursor: pointer; padding: 0;
   }
   .banner .close:hover { opacity: 1; }
+  .banner-warn { background: #fef3c7; border-color: #fcd34d; color: #78350f; }
+  .banner-info { background: #dbeafe; border-color: #93c5fd; color: #1e3a8a; }
+
+  /* ============ Modal (replaces native confirm) ============ */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+    animation: modalFadeIn 0.15s ease-out;
+    padding: 16px;
+  }
+  @keyframes modalFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .modal-card {
+    background: white;
+    border-radius: 12px;
+    padding: 28px;
+    max-width: 460px;
+    width: 100%;
+    box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+    animation: modalSlideIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  @keyframes modalSlideIn { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-title {
+    margin: 0 0 12px;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: -0.2px;
+  }
+  .modal-body {
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.55;
+    margin-bottom: 24px;
+  }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-btn {
+    padding: 9px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border-strong);
+    background: white;
+    color: var(--text);
+    font: inherit; font-size: 14px; font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .modal-btn:hover { background: var(--neutral-soft); }
+  .modal-btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
+  .modal-btn-primary:hover { background: var(--primary-hover); }
+  .modal-btn-danger { background: var(--danger); color: white; border-color: var(--danger); }
+  .modal-btn-danger:hover { background: #b91c1c; }
 
   /* ============ Responsive ============ */
   @media (max-width: 900px) {
@@ -548,7 +644,11 @@
       </button>
     </nav>
     <div class="sidebar-footer">
-      <div class="admin-chip">
+      <button class="pause-btn" id="pause-btn" title="Pause polling for this workspace (kill switch)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        <span id="pause-btn-label">Pause bot</span>
+      </button>
+      <div class="admin-chip" style="margin-top:8px">
         <div class="avatar" id="admin-avatar">·</div>
         <div class="admin-meta">
           <div class="admin-name" id="admin-email">loading…</div>
@@ -572,6 +672,11 @@
       <div id="global-error" class="banner banner-error">
         <span id="global-error-msg"></span>
         <button class="close" onclick="this.parentElement.classList.remove('show')">×</button>
+      </div>
+
+      <div id="paused-banner" class="paused-banner">
+        <span><strong>Bot is paused.</strong> No inbound mail is being processed for this workspace.</span>
+        <button type="button" id="resume-from-banner">Resume bot</button>
       </div>
 
       <!-- ============ Overview ============ -->
@@ -808,6 +913,40 @@ function $$(sel) { return Array.from(document.querySelectorAll(sel)); }
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
+
+// In-app modal that replaces window.confirm() — same Promise<boolean> contract
+// but rendered with our styles. Esc cancels, Enter confirms, click outside cancels.
+function showConfirm({ title, message, confirmText = 'Confirm', cancelText = 'Cancel', variant = 'primary' }) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-t">
+        <h3 class="modal-title" id="modal-t">${escapeHtml(title)}</h3>
+        <div class="modal-body">${escapeHtml(message).replace(/\n/g, '<br>')}</div>
+        <div class="modal-actions">
+          <button type="button" class="modal-btn" data-action="cancel">${escapeHtml(cancelText)}</button>
+          <button type="button" class="modal-btn modal-btn-${variant}" data-action="confirm">${escapeHtml(confirmText)}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    const cleanup = (result) => {
+      overlay.remove();
+      document.removeEventListener('keydown', onKey);
+      resolve(result);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); cleanup(false); }
+      else if (e.key === 'Enter') { e.preventDefault(); cleanup(true); }
+    };
+    document.addEventListener('keydown', onKey);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(false); });
+    overlay.querySelector('[data-action="cancel"]').addEventListener('click', () => cleanup(false));
+    overlay.querySelector('[data-action="confirm"]').addEventListener('click', () => cleanup(true));
+    setTimeout(() => overlay.querySelector('[data-action="confirm"]')?.focus(), 10);
+  });
+}
 function showError(msg) {
   $('#global-error-msg').textContent = msg;
   $('#global-error').classList.add('show');
@@ -889,6 +1028,55 @@ $('#signout-btn').addEventListener('click', async () => {
 let cachedMsgs = [];
 let activeFilter = 'all';
 
+function renderPauseState(paused) {
+  const btn = $('#pause-btn');
+  const label = $('#pause-btn-label');
+  const banner = $('#paused-banner');
+  if (!btn || !banner) return;
+  if (paused) {
+    btn.classList.add('paused');
+    label.textContent = 'Resume bot';
+    banner.classList.add('show');
+  } else {
+    btn.classList.remove('paused');
+    label.textContent = 'Pause bot';
+    banner.classList.remove('show');
+  }
+}
+
+async function setPaused(paused) {
+  try {
+    await safeFetch('/admin/api/settings/', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ polling: { paused } }),
+    });
+    renderPauseState(paused);
+  } catch (e) {
+    showError('Failed to ' + (paused ? 'pause' : 'resume') + ': ' + e.message);
+  }
+}
+
+async function togglePause() {
+  // Read current state from the banner visibility (cheap, no extra fetch)
+  const currentlyPaused = $('#paused-banner').classList.contains('show');
+  const willPause = !currentlyPaused;
+  if (willPause) {
+    const ok = await showConfirm({
+      title: 'Pause the bot?',
+      message: 'The poller will stop processing inbound mail for this workspace until you resume. Replies in progress will finish; nothing new will be processed.',
+      confirmText: 'Pause bot',
+      cancelText: 'Cancel',
+      variant: 'danger',
+    });
+    if (!ok) return;
+  }
+  await setPaused(willPause);
+}
+
+$('#pause-btn')?.addEventListener('click', togglePause);
+$('#resume-from-banner')?.addEventListener('click', () => setPaused(false));
+
 async function loadStatus() {
   try {
     const data = await safeFetch('/admin/api/status');
@@ -917,6 +1105,10 @@ async function loadStatus() {
          <span class="conn-meta">The bot won't poll or reply until Gmail is connected.</span>`;
     $('#gmail-status').innerHTML = statusHtml;
     $('#gmail-status-settings').innerHTML = statusHtml;
+    // Pause state (sidebar button + persistent banner)
+    if (data.tenant && typeof data.tenant.paused === 'boolean') {
+      renderPauseState(data.tenant.paused);
+    }
   } catch (err) {
     showError('Failed to load status: ' + err.message);
   }
@@ -967,7 +1159,14 @@ async function loadDocs() {
 }
 
 async function deleteDoc(id) {
-  if (!confirm('Delete this document and its chunks?')) return;
+  const ok = await showConfirm({
+    title: 'Delete this document?',
+    message: 'The PDF and all its chunks will be removed from the knowledge base. The bot will no longer be able to draw answers from this document.',
+    confirmText: 'Delete',
+    cancelText: 'Keep',
+    variant: 'danger',
+  });
+  if (!ok) return;
   try {
     await safeFetch('/admin/api/documents/' + id, { method: 'DELETE' });
     loadDocs(); loadStats();
@@ -1202,7 +1401,14 @@ $('#save-auto-send')?.addEventListener('click', () => saveSettings({
   polling: { autoSend: $('#set-auto-send').checked },
 }, 'Auto-send'));
 $('#delete-account')?.addEventListener('click', async () => {
-  if (!confirm('Delete this workspace? Data is soft-deleted now and hard-deleted in 30 days. This cannot be undone after 30 days.')) return;
+  const ok = await showConfirm({
+    title: 'Delete this workspace?',
+    message: 'All data is soft-deleted now and hard-deleted in 30 days. You can sign back in to recover within that window. After 30 days this cannot be undone.',
+    confirmText: 'Delete workspace',
+    cancelText: 'Cancel',
+    variant: 'danger',
+  });
+  if (!ok) return;
   try {
     await safeFetch('/admin/api/settings/account/delete', { method: 'POST' });
     window.location.href = '/admin/login';

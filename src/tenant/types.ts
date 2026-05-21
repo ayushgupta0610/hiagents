@@ -3,7 +3,7 @@
 // Curated list of allowed reply models (prevents tenants from picking expensive Opus etc.)
 export const ALLOWED_REPLY_MODELS = [
   'deepseek/deepseek-v4-flash',
-  'google/gemini-2.5-flash',
+  'google/gemini-3.5-flash',
   'anthropic/claude-haiku-4.5',
   'anthropic/claude-sonnet-4.5',
   'openai/gpt-4o-mini',
@@ -11,7 +11,7 @@ export const ALLOWED_REPLY_MODELS = [
 
 export const ALLOWED_CLASSIFIER_MODELS = [
   'openai/gpt-4o-mini',
-  'google/gemini-2.5-flash',
+  'google/gemini-3.5-flash',
   'anthropic/claude-haiku-4.5',
   'deepseek/deepseek-v4-flash',
 ] as const;
@@ -38,7 +38,8 @@ export interface TenantSettings {
   };
   polling: {
     intervalSeconds: number;
-    autoSend: boolean;  // false = save as Gmail draft instead of sending
+    autoSend: boolean;  // false = save reply as draft only, don't actually send
+    paused: boolean;    // operator kill switch — poller skips this tenant entirely
   };
   limits: {
     dailyEmailCap: number;       // max emails the bot processes per UTC day
@@ -68,6 +69,7 @@ export function defaultTenantSettings(): TenantSettings {
     polling: {
       intervalSeconds: 60,
       autoSend: true,
+      paused: false,
     },
     limits: {
       dailyEmailCap: 200,

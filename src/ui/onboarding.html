@@ -59,6 +59,20 @@
   .summary-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
   .summary-row:last-child { border-bottom: none; }
   .summary-row .check { width: 22px; height: 22px; border-radius: 50%; background: var(--success-soft); color: var(--success); display: grid; place-items: center; flex-shrink: 0; font-weight: 600; }
+  /* Modal (replaces native confirm) */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 16px; animation: mFade .15s ease-out; }
+  @keyframes mFade { from { opacity: 0; } to { opacity: 1; } }
+  .modal-card { background: white; border-radius: 12px; padding: 28px; max-width: 460px; width: 100%; box-shadow: 0 20px 60px rgba(15,23,42,.25); animation: mSlide .2s cubic-bezier(.16,1,.3,1); }
+  @keyframes mSlide { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  .modal-title { margin: 0 0 12px; font-size: 17px; font-weight: 600; color: var(--text); letter-spacing: -0.2px; }
+  .modal-body { color: var(--muted); font-size: 14px; line-height: 1.55; margin-bottom: 24px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .modal-btn { padding: 9px 16px; border-radius: 8px; border: 1px solid var(--border-strong); background: white; color: var(--text); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: background .15s; }
+  .modal-btn:hover { background: #f1f5f9; }
+  .modal-btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
+  .modal-btn-primary:hover { background: var(--primary-hover); }
+  .modal-btn-danger { background: #dc2626; color: white; border-color: #dc2626; }
+  .modal-btn-danger:hover { background: #b91c1c; }
 </style>
 </head>
 <body>
@@ -175,6 +189,33 @@
 </div>
 
 <script>
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+// In-app modal that replaces window.confirm() — Promise<boolean>
+function showConfirm({ title, message, confirmText = 'Confirm', cancelText = 'Cancel', variant = 'primary' }) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.innerHTML = `
+      <div class="modal-card" role="dialog" aria-modal="true">
+        <h3 class="modal-title">${escapeHtml(title)}</h3>
+        <div class="modal-body">${escapeHtml(message).replace(/\n/g, '<br>')}</div>
+        <div class="modal-actions">
+          <button type="button" class="modal-btn" data-action="cancel">${escapeHtml(cancelText)}</button>
+          <button type="button" class="modal-btn modal-btn-${variant}" data-action="confirm">${escapeHtml(confirmText)}</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const cleanup = (r) => { overlay.remove(); document.removeEventListener('keydown', onKey); resolve(r); };
+    const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); cleanup(false); } else if (e.key === 'Enter') { e.preventDefault(); cleanup(true); } };
+    document.addEventListener('keydown', onKey);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(false); });
+    overlay.querySelector('[data-action="cancel"]').addEventListener('click', () => cleanup(false));
+    overlay.querySelector('[data-action="confirm"]').addEventListener('click', () => cleanup(true));
+    setTimeout(() => overlay.querySelector('[data-action="confirm"]')?.focus(), 10);
+  });
+}
 async function api(path, opts) {
   const merged = { ...opts, headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(opts?.headers || {}) } };
   const r = await fetch(path, merged);
@@ -314,12 +355,13 @@ document.querySelectorAll('[data-back]').forEach((btn) => {
 // the user back to /admin/login to sign in with a different Google account.
 document.getElementById('start-over').addEventListener('click', async (ev) => {
   ev.preventDefault();
-  const confirmed = confirm(
-    'Start over with a different account?\n\n' +
-    'This will abandon the workspace you started setting up. You can sign back ' +
-    'in with this account within 30 days to recover it; after that it is permanently deleted.\n\n' +
-    'Continue?'
-  );
+  const confirmed = await showConfirm({
+    title: 'Start over with a different account?',
+    message: 'This will abandon the workspace you started setting up. You can sign back in with this account within 30 days to recover it; after that it is permanently deleted.',
+    confirmText: 'Start over',
+    cancelText: 'Keep working',
+    variant: 'danger',
+  });
   if (!confirmed) return;
   try {
     await api('/admin/onboarding/api/reset', { method: 'POST' });
