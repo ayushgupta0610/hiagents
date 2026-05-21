@@ -3,8 +3,14 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { requireAdmin } from '../lib/auth.js';
-import { updateSettings, markOnboardingComplete, getTenant } from '../tenant/store.js';
+import {
+  updateSettings,
+  markOnboardingComplete,
+  getTenant,
+  softDeleteTenant,
+} from '../tenant/store.js';
 import { audit } from '../tenant/audit.js';
+import { clearSession } from '../lib/auth.js';
 import { db } from '../db/client.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -141,6 +147,38 @@ onboardingRouter.post('/api/complete', requireAdmin, async (_req, res) => {
   try {
     await markOnboardingComplete(tenantId);
     await audit(tenantId, res.locals.adminEmail ?? null, 'onboarding.completed', {});
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+  }
+});
+
+// Abandon the current in-progress workspace and start fresh with a different
+// Google account. Soft-deletes the tenant (cleanup cron hard-deletes after
+// 30 days) and clears the admin session cookie so the user lands on the
+// login screen. Only allowed while onboarding is incomplete — once a tenant
+// is in production we don't want a click to silently nuke it.
+onboardingRouter.post('/api/reset', requireAdmin, async (_req, res) => {
+  const tenantId = requireTenant(res);
+  if (!tenantId) return;
+  try {
+    const tenant = await getTenant(tenantId);
+    if (!tenant) {
+      res.status(404).json({ error: 'tenant not found' });
+      return;
+    }
+    if (tenant.onboardingCompletedAt) {
+      res.status(400).json({
+        error:
+          'This workspace is already live — use Settings → Danger zone to delete it instead of "Start over".',
+      });
+      return;
+    }
+    await softDeleteTenant(tenantId);
+    await audit(tenantId, res.locals.adminEmail ?? null, 'tenant.soft_deleted', {
+      reason: 'onboarding-start-over',
+    });
+    clearSession(res);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ error: e instanceof Error ? e.message : String(e) });

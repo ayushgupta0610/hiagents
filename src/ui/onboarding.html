@@ -168,6 +168,10 @@
       <button class="btn btn-primary" id="done-finish">Go to dashboard</button>
     </div>
   </section>
+
+  <p style="text-align:center;margin-top:20px;font-size:13px;color:var(--muted)">
+    Wrong account? <a href="#" id="start-over" style="color:var(--primary);text-decoration:underline">Start over with a different account</a>
+  </p>
 </div>
 
 <script>
@@ -303,6 +307,26 @@ document.getElementById('done-finish').addEventListener('click', async () => {
 // Wire Back buttons — each carries data-back="<prev-step>"
 document.querySelectorAll('[data-back]').forEach((btn) => {
   btn.addEventListener('click', () => show(btn.dataset.back));
+});
+
+// Wire "Start over with a different account" — abandons the current
+// in-progress workspace (soft-delete, recoverable for 30 days) and sends
+// the user back to /admin/login to sign in with a different Google account.
+document.getElementById('start-over').addEventListener('click', async (ev) => {
+  ev.preventDefault();
+  const confirmed = confirm(
+    'Start over with a different account?\n\n' +
+    'This will abandon the workspace you started setting up. You can sign back ' +
+    'in with this account within 30 days to recover it; after that it is permanently deleted.\n\n' +
+    'Continue?'
+  );
+  if (!confirmed) return;
+  try {
+    await api('/admin/onboarding/api/reset', { method: 'POST' });
+    window.location.href = '/admin/login';
+  } catch (e) {
+    showErr('Failed to start over: ' + e.message);
+  }
 });
 
 loadState().catch(e => showErr(e.message));
