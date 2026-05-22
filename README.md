@@ -27,11 +27,11 @@ The poll tick processes up to 10 tenants concurrently and gracefully drains on S
 2. Apply Supabase migrations in order: `001_init.sql`, then `002_multi_tenant.sql` (see `docs/MIGRATION-002-RUNBOOK.md`).
 3. Set up Google OAuth — see [docs/GMAIL-OAUTH-SETUP.md](docs/GMAIL-OAUTH-SETUP.md).
 4. Deploy — see [docs/DEPLOY.md](docs/DEPLOY.md).
-5. Open `https://app.hiagents.digital/admin/login` and sign in with Google. You'll be auto-provisioned a tenant and walked through the onboarding wizard.
+5. Open `https://bot.aiagencycorp.com/admin/login` and sign in with Google. You'll be auto-provisioned a tenant and walked through the onboarding wizard.
 
 ## How a new user signs up
 
-1. Visit `https://app.hiagents.digital/admin/login`
+1. Visit `https://bot.aiagencycorp.com/admin/login`
 2. Click "Continue with Google"
 3. New email → new tenant + owner membership auto-provisioned
 4. Walked through the onboarding wizard:
