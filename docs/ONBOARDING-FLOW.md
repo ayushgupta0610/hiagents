@@ -39,4 +39,14 @@ order by created_at desc;
 
 ## Session cookie
 
-Cookie format: `<ts>.<base64(email)>.<base64(tenantId)>.<HMAC>`. HMAC uses `ADMIN_PASSWORD` as the secret. `requireAdmin` validates and pulls fresh membership data on every request — revoking a membership immediately revokes access.
+Cookie format: `<ts>.<base64(email)>.<base64(tenantId)>.<HMAC>`. HMAC uses `SESSION_SECRET` (≥32 chars; generate with `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`). `requireAdmin` validates HMAC, enforces a server-side max-age of 7 days (a leaked-but-unrotated cookie is refused even if the signature is intact), and pulls fresh membership data on every request — revoking a membership invalidates the cookie on next request, capped by the 30-second in-process tenant cache.
+
+A second non-httpOnly cookie `inbox_ai_csrf` holds a HMAC-signed CSRF token that the admin UI echoes via `X-CSRF-Token` on every state-changing request. `csrfGuard` middleware rejects POST/PUT/DELETE without a matching pair.
+
+## OAuth state nonce
+
+Every `/oauth/signin` and `/oauth/start` mints a 16-byte random nonce, signs it with `SESSION_SECRET`, and stores it in a 10-minute httpOnly cookie scoped to `/oauth`. `/oauth/callback` consumes the cookie and rejects any state mismatch — defends against forged-callback phishing where a victim's browser is lured to `/oauth/callback` with an attacker's `code` + `state`.
+
+## Token storage
+
+`oauth_tokens.access_token` and `oauth_tokens.refresh_token` are encrypted at rest with AES-256-GCM using `TOKEN_ENCRYPTION_KEY` (a 32-byte key, base64-encoded; ≥40 chars). Format is `v1:base64(iv || tag || ciphertext)` with a random 12-byte IV per encrypt. Rows written before encryption shipped are opportunistically re-encrypted on the next read of that mailbox — no migration step is required.

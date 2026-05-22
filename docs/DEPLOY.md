@@ -64,10 +64,10 @@ Caddy will auto-provision a Let's Encrypt cert on first request to your `DOMAIN`
 
 ## Connect Gmail
 
-1. Open `https://bot.<yourdomain>.com/admin`.
-2. Log in with `ADMIN_PASSWORD`.
-3. Click "Connect / reconnect Gmail".
-4. Complete the OAuth consent (note the unverified-app warning is expected — see GMAIL-OAUTH-SETUP.md).
+1. Open `https://bot.<yourdomain>.com/admin/login`.
+2. Sign in with Google (Google sign-in is the only way in — no password fallback).
+3. A new workspace is auto-provisioned on first signin; the onboarding wizard runs.
+4. In the wizard's Mailbox step, click "Connect Gmail" and complete the OAuth consent (the unverified-app warning is expected until you submit for verification — see GMAIL-OAUTH-SETUP.md).
 5. Verify the dashboard shows "Connected: you@yourdomain.com".
 
 ## Upload knowledge base
@@ -96,11 +96,42 @@ docker compose logs -f caddy
 
 ## Tuning
 
-Edit `.env` and `docker compose up -d` to restart:
-- `SIMILARITY_THRESHOLD` — raise to be stricter about what counts as a KB-supported question (default 0.7).
-- `TOP_K` — how many chunks to retrieve (default 5).
-- `POLL_INTERVAL_SECONDS` — how often to poll Gmail (default 60).
-- `TONE`, `SIGNATURE`, `COMPANY_DESCRIPTION` — persona.
+Per-tenant settings (persona, classifier prompt, similarity threshold, top-K, auto-send, polling pause, per-sender / per-tenant / spend caps) live in `tenants.settings` JSONB and are edited in the per-workspace Settings UI — **not** via env vars.
+
+Deployment-level env knobs (require an app restart):
+
+- `POLL_INTERVAL_SECONDS` — global cron tick cadence (default 60). Per-tenant cycles run concurrently inside each tick (cap 10).
+- `SUPABASE_MAX_SOCKETS` — outbound HTTPS sockets per origin (default 32). Raise if your Supabase pgbouncer pool is larger than 60 and you regularly run more than 10 tenants in a tick.
+- `NODE_ENV` — set to `production` to enable HSTS and `secure` cookie flag.
+
+Required secrets (see `.env.example` for generation commands):
+
+- `SESSION_SECRET` — HMAC-SHA256 key for session + CSRF cookies. ≥32 chars. Rotating invalidates every active session.
+- `TOKEN_ENCRYPTION_KEY` — AES-256-GCM key for OAuth tokens at rest. base64-encoded 32 bytes (≥40 chars). Rotating breaks decryption of existing tokens — every tenant has to reconnect Gmail.
+
+To change the reply or classifier **model** (it's deployment-wide, not per-tenant), edit `defaultTenantSettings()` in `src/tenant/types.ts` and redeploy.
+
+---
+
+## pm2 graceful shutdown
+
+The app installs SIGTERM and SIGINT handlers (`src/server.ts`) that stop accepting new HTTP connections and drain in-flight requests for up to 15 seconds before exiting. Set pm2's `kill_timeout` to ≥20 seconds in your ecosystem file so pm2's hard kill comes *after* the graceful drain:
+
+```js
+// ecosystem.config.cjs
+module.exports = {
+  apps: [{
+    name: 'inbox-ai',
+    script: 'dist/server.js',
+    instances: 1,
+    autorestart: true,
+    kill_timeout: 20000, // ms — must be > server.ts SHUTDOWN_TIMEOUT_MS (15000)
+    env: { NODE_ENV: 'production' },
+  }],
+};
+```
+
+Without this, `pm2 reload` cuts in-flight HTTP responses mid-stream and can interrupt the poll tick between fetching an email and writing its audit row.
 
 ---
 
@@ -109,7 +140,9 @@ Edit `.env` and `docker compose up -d` to restart:
 inbox-ai is now multi-tenant. A single deployment serves N tenants. Steps that change from the single-tenant guide:
 
 - **No `ADMIN_EMAILS` env var.** Anyone with a Google account can sign in and gets an auto-provisioned tenant.
-- **No tenant-specific persona / model / threshold env vars.** All per-tenant config lives in the `tenants.settings` JSONB column and is edited via the Settings UI. The env-level defaults (`SIMILARITY_THRESHOLD`, `TONE`, `SIGNATURE`, `COMPANY_DESCRIPTION`, etc.) are NO LONGER read by the running pipeline — only `defaultTenantSettings()` in code matters.
+- **No `ADMIN_PASSWORD` env var either.** The password fallback login is gone — Google sign-in is the only way in. Replaced by `SESSION_SECRET` (for HMAC) and `TOKEN_ENCRYPTION_KEY` (for OAuth-token AES encryption).
+- **No tenant-specific persona / threshold env vars.** Per-tenant config lives in the `tenants.settings` JSONB column and is edited via the Settings UI. The env-level defaults (`SIMILARITY_THRESHOLD`, `TONE`, `SIGNATURE`, `COMPANY_DESCRIPTION`, etc.) are NO LONGER read by the running pipeline — only `defaultTenantSettings()` in code matters.
+- **Reply + classifier model are deployment-wide.** Tenants don't pick — there's no model dropdown in Settings anymore. To change the model, edit `defaultTenantSettings()` in `src/tenant/types.ts` and redeploy.
 - **Single deployment, single domain.** All tenants share `bot.aiagencycorp.com`. Tenant context is derived from the signed-in user's email.
 - **Pre-add OAuth redirect URI**: `https://bot.aiagencycorp.com/oauth/callback` (just one — used for both sign-in and mailbox-connect flows, disambiguated via `state` param).
 - **Run migration 002** in the Supabase SQL editor before redeploying — see [MIGRATION-002-RUNBOOK.md](MIGRATION-002-RUNBOOK.md).
