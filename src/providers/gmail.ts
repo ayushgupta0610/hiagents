@@ -68,14 +68,46 @@ export async function loadStoredTokensForTenant(tenantId: string): Promise<OAuth
   const oauth = getOAuthClient();
   // Tokens are encrypted at rest with AES-256-GCM. decryptToken is backward
   // compatible with rows written before encryption shipped (returns as-is
-  // when the v1: prefix is absent) so existing tenants keep working until
-  // their next token rotation re-saves them encrypted.
+  // when the v1: prefix is absent).
+  const accessPlain = decryptToken(data.access_token);
+  const refreshPlain = decryptToken(data.refresh_token);
   oauth.setCredentials({
-    access_token: decryptToken(data.access_token),
-    refresh_token: decryptToken(data.refresh_token),
+    access_token: accessPlain,
+    refresh_token: refreshPlain,
     expiry_date: new Date(data.expires_at).getTime(),
     scope: data.scope,
   });
+
+  // Opportunistic re-encryption of legacy plaintext rows. Without this, any
+  // refresh_token written before AES-256-GCM landed stays plaintext forever
+  // (Google rarely issues a fresh refresh_token, so the existing OAuth2Client
+  // 'tokens' handler below almost never re-saves it). Detect the missing
+  // v1: prefix on read and immediately write the encrypted form back. Fire-
+  // and-forget — failure is logged but the request continues.
+  const accessIsLegacy = !data.access_token.startsWith('v1:');
+  const refreshIsLegacy = !data.refresh_token.startsWith('v1:');
+  if (accessIsLegacy || refreshIsLegacy) {
+    const patch: Record<string, unknown> = {};
+    if (accessIsLegacy) patch.access_token = encryptToken(accessPlain);
+    if (refreshIsLegacy) patch.refresh_token = encryptToken(refreshPlain);
+    db()
+      .from('oauth_tokens')
+      .update(patch)
+      .eq('tenant_id', tenantId)
+      .then(({ error: upErr }) => {
+        if (upErr) {
+          logger.warn(
+            { tenantId, err: upErr.message, fields: Object.keys(patch) },
+            'opportunistic token re-encrypt failed',
+          );
+        } else {
+          logger.info(
+            { tenantId, fields: Object.keys(patch) },
+            'opportunistically re-encrypted legacy oauth token row',
+          );
+        }
+      });
+  }
   oauth.on('tokens', async (tokens) => {
     if (tokens.access_token) {
       const patch: Record<string, unknown> = {
@@ -299,18 +331,44 @@ export interface SendReplyInput {
   bodyText: string;
 }
 
+// Strip CR/LF (and other RFC 2822-illegal whitespace) from any value that
+// will be interpolated into an outbound mail header. Without this, an inbound
+// email with `From: foo\r\nBcc: attacker@evil.com` would inject a Bcc into
+// every auto-reply. Encodes anything still suspicious so we don't ship a
+// raw \0 either.
+export function sanitizeHeader(value: string, maxLen = 1000): string {
+  return value
+    .replace(/[\r\n\0]/g, ' ') // CRLF/LF/CR/NUL — the actual injection vectors
+    .replace(/\s+/g, ' ') // collapse runs of whitespace produced above
+    .trim()
+    .slice(0, maxLen);
+}
+
+// Message-IDs must look like <something@host>. Reject anything that doesn't
+// match before echoing it into In-Reply-To / References, since those go into
+// outbound headers too. If the inbound id is malformed or absent, fall back
+// to the Gmail-assigned message id.
+export function sanitizeMessageId(raw: string | undefined, fallbackId: string): string {
+  const cleaned = (raw ?? '').replace(/[\r\n\0]/g, '').trim();
+  // Conservative RFC 5322 msg-id shape: <local-part@domain>. We only need
+  // *enough* validation to refuse line breaks and stray header injection.
+  if (/^<[^<>\s]+@[^<>\s]+>$/.test(cleaned)) return cleaned;
+  return `<${fallbackId}>`;
+}
+
 export async function sendReply(tenantId: string, input: SendReplyInput): Promise<string> {
   const gmail = await getGmailClientForTenant(tenantId);
-  const rawMsgId = input.originalMessageIdHeader?.trim() ?? `<${input.inReplyToMessageId}>`;
-  const msgIdRef = rawMsgId.startsWith('<') ? rawMsgId : `<${rawMsgId}>`;
+  const safeTo = sanitizeHeader(input.to, 320); // RFC 5321 max email length
+  const safeSubject = sanitizeHeader(input.subject, 998); // RFC 5322 line length
+  const msgIdRef = sanitizeMessageId(input.originalMessageIdHeader, input.inReplyToMessageId);
   const headerLines = [
-    `To: ${input.to}`,
-    `Subject: ${input.subject}`,
+    `To: ${safeTo}`,
+    `Subject: ${safeSubject}`,
     `In-Reply-To: ${msgIdRef}`,
     `References: ${msgIdRef}`,
     'MIME-Version: 1.0',
     'Content-Type: text/plain; charset="UTF-8"',
-    ...Object.entries(OUTGOING_LOOP_HEADERS).map(([k, v]) => `${k}: ${v}`),
+    ...Object.entries(OUTGOING_LOOP_HEADERS).map(([k, v]) => `${k}: ${sanitizeHeader(v)}`),
   ];
   const raw = `${headerLines.join('\r\n')}\r\n\r\n${input.bodyText}`;
   const encoded = Buffer.from(raw, 'utf-8').toString('base64url');

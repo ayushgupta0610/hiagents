@@ -360,8 +360,11 @@ async function renderSummaryAndGoDone() {
   s.steps.classifier = true;
   markDone(s.steps);
   const sum = document.getElementById('summary');
+  // Tenant name is user-controlled (set in the Welcome step), so escape it
+  // before interpolating into innerHTML — server only enforces length, not
+  // markup safety. Other labels are static strings.
   const lines = [
-    { label: `Workspace: ${s.tenant.name}`, ok: true },
+    { label: `Workspace: ${escapeHtml(s.tenant.name)}`, ok: true },
     { label: `Gmail connected`, ok: s.steps.mailbox },
     { label: `Persona configured`, ok: s.steps.persona },
     { label: `Knowledge base populated`, ok: s.steps.kb },
