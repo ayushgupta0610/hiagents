@@ -83,21 +83,21 @@
       <div class="progress-bar"></div>
       <div class="progress-label">Workspace</div>
     </div>
-    <div class="progress-step" data-step="mailbox" title="Connect the Gmail account the bot will poll and reply from">
-      <div class="progress-bar"></div>
-      <div class="progress-label">Gmail</div>
-    </div>
     <div class="progress-step" data-step="persona" title="Set the bot's tone, signature, and company description">
       <div class="progress-bar"></div>
       <div class="progress-label">Persona</div>
     </div>
-    <div class="progress-step" data-step="kb" title="Upload PDFs the bot will draw answers from">
-      <div class="progress-bar"></div>
-      <div class="progress-label">Knowledge</div>
-    </div>
     <div class="progress-step" data-step="classifier" title="Optionally tune what counts as a real customer question">
       <div class="progress-bar"></div>
       <div class="progress-label">Classifier</div>
+    </div>
+    <div class="progress-step" data-step="mailbox" title="Connect the Gmail account the bot will poll and reply from">
+      <div class="progress-bar"></div>
+      <div class="progress-label">Gmail</div>
+    </div>
+    <div class="progress-step" data-step="kb" title="Upload PDFs the bot will draw answers from">
+      <div class="progress-bar"></div>
+      <div class="progress-label">Knowledge</div>
     </div>
     <div class="progress-step" data-step="done" title="Review and go live">
       <div class="progress-bar"></div>
@@ -109,26 +109,15 @@
 
   <section class="card step" id="step-welcome" style="display:none">
     <h1>Welcome to hiagents</h1>
-    <p class="sub">Tell us what to call this workspace. You can change it later.</p>
+    <p class="sub">Tell us what to call this workspace. You can change it later in Settings.</p>
     <label for="name">Workspace name</label>
     <input id="name" placeholder="Acme Inc." maxlength="80">
     <div class="actions"><button class="btn btn-primary" id="welcome-next">Continue</button></div>
   </section>
 
-  <section class="card step" id="step-mailbox" style="display:none">
-    <h1>Connect your Gmail</h1>
-    <p class="sub">The bot polls this mailbox every minute and replies on its behalf. We use Google's official OAuth — your credentials never touch our servers.</p>
-    <div id="mailbox-status" style="margin-bottom:16px"></div>
-    <div class="actions">
-      <button type="button" class="btn" data-back="welcome">← Back</button>
-      <a class="btn btn-primary" href="/oauth/start">Connect Gmail</a>
-      <button class="btn" id="mailbox-refresh">I've connected — refresh status</button>
-    </div>
-  </section>
-
   <section class="card step" id="step-persona" style="display:none">
     <h1>How should the bot sound?</h1>
-    <p class="sub">These settings shape every reply.</p>
+    <p class="sub">These settings shape every reply. Defaults work — fine-tune now or change later in Settings.</p>
     <label>Tone</label>
     <div class="tone-chips" id="tone-chips">
       <button type="button" class="tone-chip" data-val="professional, warm, concise">Professional</button>
@@ -141,35 +130,51 @@
     <label>Signature</label>
     <input id="signature" placeholder="— Ayush, Acme Inc." maxlength="200">
 
-    <label>Company / context description</label>
-    <textarea id="companyDescription" placeholder="Acme Inc. helps small businesses ship AI features faster. We offer..." maxlength="1000"></textarea>
+    <label>Company / context description <span style="font-weight:400;color:var(--muted);font-size:12px">— optional</span></label>
+    <p style="margin:0 0 8px;color:var(--muted);font-size:12px;line-height:1.45">
+      A one-liner about your company that the bot uses to frame every reply. The model sees this as
+      "you are replying on behalf of …", so it shapes how the bot introduces itself and what context
+      it assumes about your business. Skip it to use a generic framing.
+    </p>
+    <textarea id="companyDescription" placeholder="Acme is a fintech that helps small SaaS teams manage SOC 2 compliance without a dedicated security hire." maxlength="1000"></textarea>
 
     <div class="actions">
-      <button type="button" class="btn" data-back="mailbox">← Back</button>
+      <button type="button" class="btn" data-back="welcome">← Back</button>
       <button class="btn btn-primary" id="persona-next">Continue</button>
+    </div>
+  </section>
+
+  <section class="card step" id="step-classifier" style="display:none">
+    <h1>Classifier prompt <span style="font-weight:400;color:var(--muted);font-size:14px">— optional</span></h1>
+    <p class="sub">The bot first asks a small LLM: "is this a real customer question?" If you want to tune what counts, edit the prompt below — or skip to keep the smart default. You can change this later in Settings.</p>
+    <label>Custom classifier prompt (leave empty for default)</label>
+    <textarea id="classifierPrompt" placeholder="Reply CLIENT_QUERY if the email asks anything about AI tools, automation, our pricing, or our services. Reply OTHER for newsletters, receipts, or empty/test messages. Reply with exactly one word." maxlength="2000"></textarea>
+    <div class="actions">
+      <button type="button" class="btn" data-back="persona">← Back</button>
+      <button class="btn btn-primary" id="classifier-next">Continue</button>
+      <button class="skip-link" id="classifier-skip">Use default</button>
+    </div>
+  </section>
+
+  <section class="card step" id="step-mailbox" style="display:none">
+    <h1>Connect your Gmail</h1>
+    <p class="sub">The bot polls this mailbox every minute and replies on its behalf. We use Google's official OAuth — your credentials never touch our servers.</p>
+    <div id="mailbox-status" style="margin-bottom:16px"></div>
+    <div class="actions">
+      <button type="button" class="btn" data-back="classifier">← Back</button>
+      <a class="btn btn-primary" href="/oauth/start">Connect Gmail</a>
+      <button class="btn" id="mailbox-refresh">I've connected — refresh status</button>
     </div>
   </section>
 
   <section class="card step" id="step-kb" style="display:none">
     <h1>Upload your knowledge base</h1>
-    <p class="sub">Drop one or more PDFs. The bot draws every answer from these documents — it won't make things up. You can add more later.</p>
+    <p class="sub">Drop one or more PDFs. The bot draws every answer from these documents — it won't make things up. You can add more later from the dashboard.</p>
     <label class="file-area" for="kb-file">Drop a PDF here, or click to choose<input type="file" id="kb-file" accept="application/pdf" multiple></label>
     <div id="kb-upload-status"></div>
     <div class="actions">
-      <button type="button" class="btn" data-back="persona">← Back</button>
+      <button type="button" class="btn" data-back="mailbox">← Back</button>
       <button class="btn btn-primary" id="kb-next" disabled>Continue</button>
-    </div>
-  </section>
-
-  <section class="card step" id="step-classifier" style="display:none">
-    <h1>Classifier prompt (optional)</h1>
-    <p class="sub">The bot first asks a small LLM: "is this a real customer question?" If you want to tune what counts, edit the prompt below — or skip to keep the smart default.</p>
-    <label>Custom classifier prompt (leave empty for default)</label>
-    <textarea id="classifierPrompt" placeholder="Reply CLIENT_QUERY if the email asks anything about AI tools, automation, our pricing, or our services. Reply OTHER for newsletters, receipts, or empty/test messages. Reply with exactly one word." maxlength="2000"></textarea>
-    <div class="actions">
-      <button type="button" class="btn" data-back="kb">← Back</button>
-      <button class="btn btn-primary" id="classifier-next">Continue</button>
-      <button class="skip-link" id="classifier-skip">Use default</button>
     </div>
   </section>
 
@@ -178,7 +183,7 @@
     <p class="sub">Here's a summary. The bot will start polling within 60 seconds.</p>
     <div id="summary"></div>
     <div class="actions" style="margin-top:24px">
-      <button type="button" class="btn" data-back="classifier">← Back</button>
+      <button type="button" class="btn" data-back="kb">← Back</button>
       <button class="btn btn-primary" id="done-finish">Go to dashboard</button>
     </div>
   </section>
@@ -259,15 +264,35 @@ function markDone(steps) {
     document.querySelector(`.progress-step[data-step="${name}"]`)?.classList.toggle('done', !!done);
   }
 }
+// Classifier is the only step the server can't natively detect as "visited"
+// (its prompt field can legitimately stay null = use default). We track it
+// client-side via sessionStorage keyed on the tenant id, so reloads inside
+// the same browser tab resume past the classifier step. If the user
+// navigates away and comes back in a fresh tab, they see classifier once
+// more — harmless, takes one click to skip.
+function classifierSeenKey(tenantId) {
+  return `hiagents_onboarding_classifier_seen_${tenantId}`;
+}
+function markClassifierSeen(tenantId) {
+  try { sessionStorage.setItem(classifierSeenKey(tenantId), '1'); } catch { /* private mode */ }
+}
+function isClassifierSeen(tenantId) {
+  try { return sessionStorage.getItem(classifierSeenKey(tenantId)) === '1'; } catch { return false; }
+}
+
 async function loadState() {
   const s = await api('/admin/onboarding/api/state');
   markDone(s.steps);
   if (s.steps.done) { window.location.href = '/admin'; return; }
+  // New onboarding order: Workspace → Persona → Classifier → Gmail → Knowledge → Review.
+  // Persona + Classifier are pure form steps, so we let users finish them
+  // before the (slower, third-party-flow) Gmail step.
   if (!s.steps.welcome) return show('welcome');
-  if (!s.steps.mailbox) { await refreshMailbox(); return show('mailbox'); }
   if (!s.steps.persona) return show('persona');
+  if (!isClassifierSeen(s.tenant.id)) return show('classifier');
+  if (!s.steps.mailbox) { await refreshMailbox(); return show('mailbox'); }
   if (!s.steps.kb) return show('kb');
-  return show('classifier');
+  return renderSummaryAndGoDone();
 }
 
 document.getElementById('welcome-next').addEventListener('click', async () => {
@@ -296,11 +321,12 @@ document.querySelectorAll('.tone-chip').forEach(el => el.addEventListener('click
 }));
 document.getElementById('persona-next').addEventListener('click', async () => {
   const payload = {
-    signature: document.getElementById('signature').value.trim() || '— Sent by your AI assistant',
-    tone: document.getElementById('tone').value.trim() || 'professional, warm, concise',
+    signature: document.getElementById('signature').value.trim(),
+    tone: document.getElementById('tone').value.trim(),
+    // Optional now — empty companyDescription is fine; the model falls back to
+    // a generic "the recipient" framing in generate.ts.
     companyDescription: document.getElementById('companyDescription').value.trim(),
   };
-  if (!payload.companyDescription) { showErr('Add a short company description — the bot uses it to ground replies'); return; }
   try { await api('/admin/onboarding/api/persona', { method: 'POST', body: JSON.stringify(payload) }); await loadState(); }
   catch(e) { showErr(e.message); }
 });
@@ -339,17 +365,21 @@ kbFile.addEventListener('change', async () => {
 });
 kbNext.addEventListener('click', () => loadState());
 
-document.getElementById('classifier-next').addEventListener('click', async () => {
+async function saveClassifierAndAdvance(prompt) {
   try {
-    await api('/admin/onboarding/api/classifier', { method: 'POST', body: JSON.stringify({ prompt: document.getElementById('classifierPrompt').value }) });
-    await renderSummaryAndGoDone();
+    await api('/admin/onboarding/api/classifier', { method: 'POST', body: JSON.stringify({ prompt }) });
+    // Mark classifier seen so we don't loop back here on next loadState().
+    // tenant id comes from the most recent state fetch — re-fetch to be safe.
+    const s = await api('/admin/onboarding/api/state');
+    markClassifierSeen(s.tenant.id);
+    await loadState();
   } catch (e) { showErr(e.message); }
+}
+document.getElementById('classifier-next').addEventListener('click', () => {
+  saveClassifierAndAdvance(document.getElementById('classifierPrompt').value);
 });
-document.getElementById('classifier-skip').addEventListener('click', async () => {
-  try {
-    await api('/admin/onboarding/api/classifier', { method: 'POST', body: JSON.stringify({ prompt: '' }) });
-    await renderSummaryAndGoDone();
-  } catch (e) { showErr(e.message); }
+document.getElementById('classifier-skip').addEventListener('click', () => {
+  saveClassifierAndAdvance('');
 });
 
 async function renderSummaryAndGoDone() {
@@ -365,10 +395,10 @@ async function renderSummaryAndGoDone() {
   // markup safety. Other labels are static strings.
   const lines = [
     { label: `Workspace: ${escapeHtml(s.tenant.name)}`, ok: true },
-    { label: `Gmail connected`, ok: s.steps.mailbox },
     { label: `Persona configured`, ok: s.steps.persona },
-    { label: `Knowledge base populated`, ok: s.steps.kb },
     { label: `Classifier ready`, ok: true },
+    { label: `Gmail connected`, ok: s.steps.mailbox },
+    { label: `Knowledge base populated`, ok: s.steps.kb },
   ];
   sum.innerHTML = lines.map(l => `<div class="summary-row"><span class="check">${l.ok ? '✓' : '·'}</span>${l.label}</div>`).join('');
   show('done');

@@ -825,23 +825,6 @@
         </div>
 
         <div class="card">
-          <div class="card-header"><div><h2>Retrieval</h2><p class="sub">How strict knowledge-base retrieval is for grounding replies.</p></div></div>
-          <div class="card-body">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-              <div>
-                <label style="font-size:13px;font-weight:500;margin-bottom:6px;display:block">Similarity threshold (0-1)</label>
-                <input id="set-threshold" type="number" min="0" max="1" step="0.05" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:6px;font:inherit;font-size:13px">
-              </div>
-              <div>
-                <label style="font-size:13px;font-weight:500;margin-bottom:6px;display:block">Top-K chunks</label>
-                <input id="set-topk" type="number" min="1" max="50" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:6px;font:inherit;font-size:13px">
-              </div>
-            </div>
-            <button class="btn btn-primary" id="save-retrieval" style="margin-top:16px">Save retrieval</button>
-          </div>
-        </div>
-
-        <div class="card">
           <div class="card-header"><div><h2>Classifier prompt</h2><p class="sub">Override the prompt the classifier uses. Leave empty to use the smart default.</p></div></div>
           <div class="card-body">
             <textarea id="set-classifier-prompt" rows="6" maxlength="2000" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:6px;font:inherit;font-size:13px;resize:vertical"></textarea>
@@ -861,7 +844,7 @@
         </div>
 
         <div class="card">
-          <div class="card-header"><div><h2>LLM usage (last 30 days)</h2><p class="sub">Per-model token and cost breakdown for this workspace.</p></div></div>
+          <div class="card-header"><div><h2>AI usage (last 30 days)</h2><p class="sub">What the bot has cost this workspace in LLM spend.</p></div></div>
           <div class="card-body"><div id="usage-summary"><div style="color:var(--text-muted)">Loading…</div></div></div>
         </div>
 
@@ -1361,19 +1344,18 @@ async function loadSettings() {
     $('#set-tone').value = settings.persona.tone;
     $('#set-signature').value = settings.persona.signature;
     $('#set-company').value = settings.persona.companyDescription;
-    $('#set-threshold').value = settings.retrieval.similarityThreshold;
-    $('#set-topk').value = settings.retrieval.topK;
     $('#set-classifier-prompt').value = settings.classifier.prompt ?? '';
     $('#set-auto-send').checked = settings.polling.autoSend;
 
+    // AI usage card: total cost only. The per-model breakdown is interesting
+    // to an operator (which model is burning the budget) but adds clutter for
+    // a tenant who just wants to see "what is this costing me?".
     const usage = await safeFetch('/admin/api/settings/usage');
-    $('#usage-summary').innerHTML = `
-      <div style="font-size:14px;margin-bottom:8px"><strong>${usage.totalTokens.toLocaleString()}</strong> tokens · <strong>$${usage.totalCostUsd.toFixed(4)}</strong> total</div>
-      ${usage.byModel.length === 0 ? '<div style="color:var(--text-muted)">No usage yet.</div>' :
-        '<table style="width:100%;margin-top:8px"><thead><tr><th>Model</th><th>Tokens</th><th>Cost</th></tr></thead><tbody>' +
-        usage.byModel.map(m => `<tr><td>${escapeHtml(m.model)}</td><td>${m.tokens.toLocaleString()}</td><td>$${m.costUsd.toFixed(4)}</td></tr>`).join('') +
-        '</tbody></table>'}
-    `;
+    const cost = Number(usage.totalCostUsd ?? 0);
+    $('#usage-summary').innerHTML = cost > 0
+      ? `<div style="font-size:22px;font-weight:600;letter-spacing:-0.4px">$${cost.toFixed(4)}</div>
+         <div style="font-size:12px;color:var(--text-muted);margin-top:4px">across all bot replies in the last 30 days</div>`
+      : `<div style="color:var(--text-muted)">No usage yet — the bot will start showing here once it sends its first reply.</div>`;
   } catch (e) { showError('Settings load failed: ' + e.message); }
 }
 
@@ -1387,9 +1369,6 @@ async function saveSettings(patch, msg) {
 $('#save-persona')?.addEventListener('click', () => saveSettings({
   persona: { tone: $('#set-tone').value, signature: $('#set-signature').value, companyDescription: $('#set-company').value },
 }, 'Persona'));
-$('#save-retrieval')?.addEventListener('click', () => saveSettings({
-  retrieval: { similarityThreshold: parseFloat($('#set-threshold').value), topK: parseInt($('#set-topk').value, 10) },
-}, 'Retrieval'));
 $('#save-classifier-prompt')?.addEventListener('click', () => saveSettings({
   classifier: { prompt: $('#set-classifier-prompt').value || null },
 }, 'Classifier prompt'));

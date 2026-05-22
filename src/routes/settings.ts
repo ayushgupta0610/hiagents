@@ -51,6 +51,12 @@ const personaPatchSchema = z
     signature: z.string().max(200),
     tone: z.string().max(200),
     companyDescription: z.string().max(1000),
+    // configured is a one-way "user has clicked through Persona at least once"
+    // flag; the persona POST in src/routes/onboarding.ts sets it. Leaving it
+    // accepted via the generic settings PUT too is harmless — a tenant
+    // toggling it back to false would just re-show the Persona step in
+    // onboarding, and they couldn't reach that page once onboarding is done.
+    configured: z.boolean(),
   })
   .strict()
   .partial();

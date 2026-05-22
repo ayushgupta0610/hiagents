@@ -70,7 +70,10 @@ onboardingRouter.get('/api/state', requireAdmin, async (_req, res) => {
     steps: {
       welcome: !!tenant.name && !looksAutoProvisioned,
       mailbox: !!oauth?.email,
-      persona: !!tenant.settings.persona.companyDescription,
+      // Persona is "done" once the user has explicitly submitted the step at
+      // least once. companyDescription is no longer required, so we can't use
+      // it as the signal anymore.
+      persona: !!tenant.settings.persona.configured,
       kb: (docsCount ?? 0) > 0,
       // Classifier shows "done" only after the full wizard is complete — during the
       // wizard itself, it's the step the user is currently on (or hasn't reached yet),
@@ -108,23 +111,21 @@ onboardingRouter.post('/api/persona', requireAdmin, csrfGuard, async (req, res) 
   const tenantId = requireTenant(res);
   if (!tenantId) return;
   const { signature, tone, companyDescription } = req.body ?? {};
-  if (
-    typeof signature !== 'string' ||
-    typeof tone !== 'string' ||
-    typeof companyDescription !== 'string'
-  ) {
-    sendError(res, 400, {
-      code: 'validation-failed',
-      message: 'Please fill in signature, tone, and company description.',
-    });
-    return;
-  }
+  // All three are optional during onboarding; the user can keep defaults and
+  // refine later in Settings. We coerce undefined / null → '' so the merge
+  // doesn't store the wrong type.
+  const safeSig = typeof signature === 'string' ? signature : '';
+  const safeTone = typeof tone === 'string' ? tone : '';
+  const safeCompany = typeof companyDescription === 'string' ? companyDescription : '';
   try {
     await updateSettings(tenantId, {
       persona: {
-        signature: signature.slice(0, 200),
-        tone: tone.slice(0, 200),
-        companyDescription: companyDescription.slice(0, 1000),
+        signature: safeSig.slice(0, 200),
+        tone: safeTone.slice(0, 200),
+        companyDescription: safeCompany.slice(0, 1000),
+        // Mark the step as visited so the onboarding routing can move past it
+        // even if the user didn't customize anything.
+        configured: true,
       },
     });
     res.json({ ok: true });

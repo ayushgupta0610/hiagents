@@ -16,6 +16,11 @@ export interface TenantSettings {
     signature: string;
     tone: string;
     companyDescription: string;
+    // True once the user has explicitly submitted the persona step at least
+    // once during onboarding. Used to drive the onboarding "step done?"
+    // computation independently of the (now-optional) companyDescription
+    // field, so users who keep all defaults can still progress past Persona.
+    configured: boolean;
   };
   classifier: {
     model: ClassifierModel;
@@ -48,6 +53,7 @@ export function defaultTenantSettings(): TenantSettings {
       signature: '— Sent by hiagents',
       tone: 'professional, warm, concise',
       companyDescription: '',
+      configured: false,
     },
     classifier: {
       model: 'openai/gpt-4o-mini',
