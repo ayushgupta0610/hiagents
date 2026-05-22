@@ -31,7 +31,10 @@ export function getOAuthClient(): OAuth2Client {
   );
 }
 
-export function buildMailboxAuthUrl(tenantId: string): string {
+// `state` is built and signed by the caller (routes/oauth.ts) so the state
+// nonce defends against forged callbacks. Callers MUST pass the same state
+// payload they stored in the oauth_state cookie.
+export function buildMailboxAuthUrl(state: string): string {
   const client = getOAuthClient();
   return client.generateAuthUrl({
     access_type: 'offline',
@@ -40,17 +43,17 @@ export function buildMailboxAuthUrl(tenantId: string): string {
     // Google reliably returns a refresh_token).
     prompt: 'select_account consent',
     scope: MAILBOX_SCOPES,
-    state: `mailbox:${tenantId}`,
+    state,
   });
 }
 
-export function buildSigninAuthUrl(): string {
+export function buildSigninAuthUrl(state: string): string {
   const client = getOAuthClient();
   return client.generateAuthUrl({
     access_type: 'online',
     prompt: 'select_account',
     scope: SIGNIN_SCOPES,
-    state: 'login',
+    state,
   });
 }
 

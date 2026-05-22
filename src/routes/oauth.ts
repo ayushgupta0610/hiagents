@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { google } from 'googleapis';
+import { randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
 import {
   MAILBOX_SCOPES,
   getOAuthClient,
@@ -13,6 +14,7 @@ import { findTenantForEmail, provisionTenant } from '../tenant/store.js';
 import { audit } from '../tenant/audit.js';
 import { logger } from '../lib/logger.js';
 import { db } from '../db/client.js';
+import { env } from '../config.js';
 
 export const oauthRouter: Router = Router();
 
@@ -25,6 +27,65 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;');
 }
 
+// ============================================================
+// OAuth state nonce — defends against forged-callback phishing
+// ============================================================
+//
+// Without a nonce, anyone with a stolen Google authorization code (or a
+// crafted callback URL) could trick a victim's browser into landing on
+// /oauth/callback with attacker-controlled `state`. We bind every flow to
+// a one-time nonce stored in a short-lived signed cookie:
+//
+//   1. /oauth/signin   → set cookie `oauth_state` = sign("login:" + nonce)
+//                         redirect with state = "login:" + nonce
+//   2. /oauth/start    → set cookie `oauth_state` = sign("mailbox:<tid>:" + nonce)
+//                         redirect with state = "mailbox:" + tid + ":" + nonce
+//   3. /oauth/callback → verify the state in the URL matches the cookie's
+//                         signed value; reject if missing or mismatched.
+//
+// Cookie is sameSite=lax (so it travels on the top-level redirect back from
+// Google, which is a same-site GET), httpOnly (JS can't read it), 10-min
+// max-age (long enough for the user to complete the Google consent screen,
+// short enough to limit the attack window).
+
+const STATE_COOKIE = 'inbox_ai_oauth_state';
+const STATE_MAX_AGE_MS = 10 * 60 * 1000;
+
+function signState(payload: string): string {
+  return createHmac('sha256', env.SESSION_SECRET).update(`oauth:${payload}`).digest('hex');
+}
+
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a);
+  const bb = Buffer.from(b);
+  if (ab.length !== bb.length) return false;
+  return timingSafeEqual(ab, bb);
+}
+
+function setStateCookie(res: import('express').Response, statePayload: string): void {
+  const cookieValue = `${statePayload}.${signState(statePayload)}`;
+  res.cookie(STATE_COOKIE, cookieValue, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: env.NODE_ENV === 'production',
+    maxAge: STATE_MAX_AGE_MS,
+    path: '/oauth',
+  });
+}
+
+function consumeStateCookie(req: import('express').Request, res: import('express').Response): string | null {
+  const raw = req.cookies?.[STATE_COOKIE];
+  // Always clear — single-use, even on failure.
+  res.clearCookie(STATE_COOKIE, { path: '/oauth' });
+  if (typeof raw !== 'string') return null;
+  const lastDot = raw.lastIndexOf('.');
+  if (lastDot <= 0) return null;
+  const payload = raw.slice(0, lastDot);
+  const sig = raw.slice(lastDot + 1);
+  if (!safeEqual(sig, signState(payload))) return null;
+  return payload;
+}
+
 // Mailbox connect flow — admin must be signed in; state encodes their tenant id
 oauthRouter.get('/start', requireAdmin, (_req, res) => {
   const tenantId = res.locals.tenantId;
@@ -35,7 +96,10 @@ oauthRouter.get('/start', requireAdmin, (_req, res) => {
       .send('<p>You must be signed in to a workspace before connecting a mailbox.</p>');
     return;
   }
-  res.redirect(buildMailboxAuthUrl(tenantId));
+  const nonce = randomBytes(16).toString('base64url');
+  const statePayload = `mailbox:${tenantId}:${nonce}`;
+  setStateCookie(res, statePayload);
+  res.redirect(buildMailboxAuthUrl(statePayload));
 });
 
 // Anti-abuse: 5 signin starts per IP per hour. Stops bots from creating
@@ -52,14 +116,36 @@ const signinLimiter = rateLimit({
 
 // Admin sign-in flow — public, auto-provisions a tenant on first signin
 oauthRouter.get('/signin', signinLimiter, (_req, res) => {
-  res.redirect(buildSigninAuthUrl());
+  const nonce = randomBytes(16).toString('base64url');
+  const statePayload = `login:${nonce}`;
+  setStateCookie(res, statePayload);
+  res.redirect(buildSigninAuthUrl(statePayload));
 });
 
-// Unified callback — routes on `state`
+// Unified callback — routes on `state`. Verifies the state nonce against
+// the signed cookie BEFORE doing anything with the code (so we never
+// exchange a code for tokens for an unverified flow).
 oauthRouter.get('/callback', async (req, res) => {
   const code = typeof req.query.code === 'string' ? req.query.code : null;
   const stateRaw = typeof req.query.state === 'string' ? req.query.state : '';
-  const [stateKind, stateTenantId] = stateRaw.split(':');
+
+  // 1. Verify state nonce matches the signed cookie we set when the flow began.
+  const cookiePayload = consumeStateCookie(req, res);
+  if (!cookiePayload || !stateRaw || !safeEqual(stateRaw, cookiePayload)) {
+    logger.warn(
+      { ip: req.ip, stateRaw, hadCookie: !!cookiePayload },
+      'oauth callback rejected: state nonce mismatch',
+    );
+    res
+      .status(400)
+      .type('html')
+      .send(
+        '<p>This sign-in link is invalid or has expired. Please <a href="/admin/login">start the sign-in again</a> from the login page.</p>',
+      );
+    return;
+  }
+
+  const [stateKind, stateTenantOrNonce] = stateRaw.split(':');
   if (!code) {
     res.status(400).type('html').send('<p>Missing authorization code.</p>');
     return;
@@ -88,18 +174,19 @@ oauthRouter.get('/callback', async (req, res) => {
         await audit(tenant.id, email, 'tenant.provisioned', { via: 'google-signin' });
         logger.info({ email, tenantId: tenant.id }, 'auto-provisioned new tenant');
         issueSessionForEmail(res, email, tenant.id);
-        await audit(tenant.id, email, 'auth.signin', { method: 'google' });
+        await audit(tenant.id, email, 'auth.signin', { method: 'google', ip: req.ip });
         res.redirect('/admin/onboarding');
         return;
       }
-      await audit(found.tenant.id, email, 'auth.signin', { method: 'google' });
+      await audit(found.tenant.id, email, 'auth.signin', { method: 'google', ip: req.ip });
       issueSessionForEmail(res, email, found.tenant.id);
       res.redirect(found.tenant.onboardingCompletedAt ? '/admin' : '/admin/onboarding');
       return;
     }
 
-    // Mailbox connect flow — state was "mailbox:<tenantId>"
+    // Mailbox connect flow — state was "mailbox:<tenantId>:<nonce>"
     if (stateKind === 'mailbox') {
+      const stateTenantId = stateTenantOrNonce;
       if (!stateTenantId) {
         res
           .status(400)
@@ -126,7 +213,7 @@ oauthRouter.get('/callback', async (req, res) => {
         },
         email,
       );
-      await audit(stateTenantId, email, 'gmail.connected', {});
+      await audit(stateTenantId, email, 'gmail.connected', { ip: req.ip });
       logger.info({ email, tenantId: stateTenantId }, 'gmail mailbox connected');
 
       // Look up the tenant's onboarding state so we know where to send them.
@@ -144,7 +231,12 @@ oauthRouter.get('/callback', async (req, res) => {
     res.status(400).type('html').send(`<p>Unknown OAuth state: ${escapeHtml(stateRaw)}</p>`);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    logger.error({ err: msg, state: stateRaw }, 'oauth callback failed');
-    res.status(500).type('html').send(`<p>OAuth failed: ${escapeHtml(msg)}</p>`);
+    logger.error({ err: msg, state: stateRaw, ip: req.ip }, 'oauth callback failed');
+    res
+      .status(500)
+      .type('html')
+      .send(
+        '<p>We couldn\'t complete the sign-in. Please <a href="/admin/login">try again</a>. If this keeps happening, contact support.</p>',
+      );
   }
 });

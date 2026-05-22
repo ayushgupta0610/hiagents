@@ -11,6 +11,7 @@ import {
 } from '../tenant/store.js';
 import { audit } from '../tenant/audit.js';
 import { clearSession } from '../lib/auth.js';
+import { sendError } from '../lib/errors.js';
 import { db } from '../db/client.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -20,7 +21,10 @@ export const onboardingRouter: Router = Router();
 function requireTenant(res: import('express').Response): string | null {
   const tenantId = res.locals.tenantId as string | null;
   if (!tenantId) {
-    res.status(400).json({ error: 'sign in with Google to access onboarding' });
+    sendError(res, 400, {
+      code: 'tenant-required',
+      message: 'Sign in with Google to start onboarding.',
+    });
     return null;
   }
   return tenantId;
@@ -37,7 +41,7 @@ onboardingRouter.get('/api/state', requireAdmin, async (_req, res) => {
   if (!tenantId) return;
   const tenant = await getTenant(tenantId);
   if (!tenant) {
-    res.status(404).json({ error: 'tenant' });
+    sendError(res, 404, { code: 'not-found', message: 'This workspace no longer exists.' });
     return;
   }
 
@@ -82,12 +86,19 @@ onboardingRouter.post('/api/welcome', requireAdmin, csrfGuard, async (req, res) 
   if (!tenantId) return;
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
   if (!name || name.length > 80) {
-    res.status(400).json({ error: 'name required (1-80 chars)' });
+    sendError(res, 400, {
+      code: 'validation-failed',
+      message: 'Workspace name is required and must be 80 characters or fewer.',
+    });
     return;
   }
   const { error } = await db().from('tenants').update({ name }).eq('id', tenantId);
   if (error) {
-    res.status(500).json({ error: error.message });
+    sendError(res, 500, {
+      code: 'internal-error',
+      message: "We couldn't save your workspace name. Please try again.",
+      internal: error,
+    });
     return;
   }
   res.json({ ok: true });
@@ -102,7 +113,10 @@ onboardingRouter.post('/api/persona', requireAdmin, csrfGuard, async (req, res) 
     typeof tone !== 'string' ||
     typeof companyDescription !== 'string'
   ) {
-    res.status(400).json({ error: 'signature, tone, companyDescription required' });
+    sendError(res, 400, {
+      code: 'validation-failed',
+      message: 'Please fill in signature, tone, and company description.',
+    });
     return;
   }
   try {
@@ -115,7 +129,11 @@ onboardingRouter.post('/api/persona', requireAdmin, csrfGuard, async (req, res) 
     });
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+    sendError(res, 500, {
+      code: 'internal-error',
+      message: "We couldn't save your persona. Please try again in a moment.",
+      internal: e,
+    });
   }
 });
 
@@ -124,13 +142,16 @@ onboardingRouter.post('/api/classifier', requireAdmin, csrfGuard, async (req, re
   if (!tenantId) return;
   const prompt = typeof req.body?.prompt === 'string' ? req.body.prompt.trim() : '';
   if (prompt.length > 2000) {
-    res.status(400).json({ error: 'prompt too long (max 2000)' });
+    sendError(res, 400, {
+      code: 'validation-failed',
+      message: 'That classifier prompt is too long. Keep it under 2,000 characters.',
+    });
     return;
   }
   try {
     const current = await getTenant(tenantId);
     if (!current) {
-      res.status(404).json({ error: 'tenant not found' });
+      sendError(res, 404, { code: 'not-found', message: 'This workspace no longer exists.' });
       return;
     }
     await updateSettings(tenantId, {
@@ -138,7 +159,11 @@ onboardingRouter.post('/api/classifier', requireAdmin, csrfGuard, async (req, re
     });
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+    sendError(res, 500, {
+      code: 'internal-error',
+      message: "We couldn't save your classifier prompt. Please try again in a moment.",
+      internal: e,
+    });
   }
 });
 
@@ -150,7 +175,11 @@ onboardingRouter.post('/api/complete', requireAdmin, csrfGuard, async (_req, res
     await audit(tenantId, res.locals.adminEmail ?? null, 'onboarding.completed', {});
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+    sendError(res, 500, {
+      code: 'internal-error',
+      message: "We couldn't finalize onboarding. Please try again in a moment.",
+      internal: e,
+    });
   }
 });
 
@@ -165,13 +194,14 @@ onboardingRouter.post('/api/reset', requireAdmin, csrfGuard, async (_req, res) =
   try {
     const tenant = await getTenant(tenantId);
     if (!tenant) {
-      res.status(404).json({ error: 'tenant not found' });
+      sendError(res, 404, { code: 'not-found', message: 'This workspace no longer exists.' });
       return;
     }
     if (tenant.onboardingCompletedAt) {
-      res.status(400).json({
-        error:
-          'This workspace is already live — use Settings → Danger zone to delete it instead of "Start over".',
+      sendError(res, 400, {
+        code: 'conflict',
+        message:
+          'This workspace is already live. To remove it, go to Settings → Danger zone instead of "Start over".',
       });
       return;
     }
@@ -182,6 +212,10 @@ onboardingRouter.post('/api/reset', requireAdmin, csrfGuard, async (_req, res) =
     clearSession(res);
     res.json({ ok: true });
   } catch (e) {
-    res.status(500).json({ error: e instanceof Error ? e.message : String(e) });
+    sendError(res, 500, {
+      code: 'internal-error',
+      message: "We couldn't reset onboarding. Please try again in a moment.",
+      internal: e,
+    });
   }
 });

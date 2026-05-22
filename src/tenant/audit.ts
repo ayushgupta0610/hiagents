@@ -11,6 +11,7 @@ export type AuditAction =
   | 'kb.upload'
   | 'kb.delete'
   | 'auth.signin'
+  | 'auth.signin_failed'
   | 'auth.signout'
   | 'onboarding.completed';
 

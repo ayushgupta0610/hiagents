@@ -2,6 +2,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import { env } from './config.js';
 import { logger } from './lib/logger.js';
+import { sendUnhandled, sendError } from './lib/errors.js';
 import { healthRouter } from './routes/health.js';
 import { oauthRouter } from './routes/oauth.js';
 import { adminRouter } from './routes/admin.js';
@@ -56,10 +57,30 @@ app.get('/', (_req, res) => {
   res.redirect('/admin');
 });
 
-const errorHandler: express.ErrorRequestHandler = (err, _req, res, _next) => {
-  const error = err as Error;
-  logger.error({ err: error.message, stack: error.stack }, 'unhandled error');
-  res.status(500).json({ error: 'internal error' });
+// JSON parse errors from express.json() throw before any route runs — turn
+// them into the same envelope rather than the default HTML page.
+const errorHandler: express.ErrorRequestHandler = (err, req, res, _next) => {
+  const e = err as Error & { type?: string; status?: number };
+  if (e?.type === 'entity.too.large') {
+    sendError(res, 413, {
+      code: 'payload-too-large',
+      message: 'That request was too large. PDF uploads have a separate 25 MB limit on /admin/api/documents.',
+      internal: e,
+    });
+    return;
+  }
+  if (e?.type === 'entity.parse.failed' || /JSON/i.test(e?.message ?? '')) {
+    sendError(res, 400, {
+      code: 'validation-failed',
+      message: "We couldn't read the request body. Please refresh the page and try again.",
+      internal: e,
+    });
+    return;
+  }
+  // Last-resort catch-all. Logs the full stack server-side; client gets a
+  // friendly generic message via sendUnhandled.
+  logger.error({ err: e?.message, path: req.path, method: req.method }, 'unhandled error');
+  sendUnhandled(res, e);
 };
 app.use(errorHandler);
 

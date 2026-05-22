@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { env } from '../config.js';
 import { findTenantForEmail, touchMembership } from '../tenant/store.js';
+import { sendError } from './errors.js';
 
 const COOKIE = 'inbox_ai_admin';
 
@@ -99,7 +100,10 @@ export async function requireAdmin(req: Request, res: Response, next: NextFuncti
     }
   }
   if (req.path.startsWith('/api/') || req.xhr) {
-    res.status(401).json({ error: 'unauthorized', loginUrl: '/admin/login' });
+    sendError(res, 401, {
+      code: 'unauthorized',
+      message: 'Your session has expired. Sign in again to continue.',
+    });
   } else {
     res.redirect('/admin/login');
   }
@@ -158,7 +162,9 @@ export function csrfGuard(req: Request, res: Response, next: NextFunction): void
     next();
     return;
   }
-  res
-    .status(403)
-    .json({ error: 'csrf-failed', message: 'Session expired or request blocked by CSRF protection. Refresh the page and try again.' });
+  sendError(res, 403, {
+    code: 'csrf-failed',
+    message:
+      'Your session expired or this request was blocked for security. Refresh the page and try again.',
+  });
 }

@@ -4,7 +4,9 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { requireAdmin, clearSession, getSessionEmail, csrfGuard, issueCsrfToken } from '../lib/auth.js';
+import { sendError } from '../lib/errors.js';
 import { ingestPdf, deleteDocument, listDocuments } from '../kb/ingest.js';
+import { audit } from '../tenant/audit.js';
 import type { Tenant } from '../tenant/store.js';
 import { db } from '../db/client.js';
 
@@ -31,7 +33,12 @@ adminRouter.get('/login', async (_req, res) => {
 
 // Logout is POST-only to prevent CSRF (image-tag forced-logout). Requires
 // a valid CSRF token from the dashboard, which is set when the page renders.
-adminRouter.post('/auth/logout', requireAdmin, csrfGuard, (_req, res) => {
+adminRouter.post('/auth/logout', requireAdmin, csrfGuard, async (req, res) => {
+  const tenantId = res.locals.tenantId as string | null;
+  const adminEmail = (res.locals.adminEmail as string | null) ?? null;
+  if (tenantId) {
+    await audit(tenantId, adminEmail, 'auth.signout', { ip: req.ip });
+  }
   clearSession(res);
   res.json({ ok: true });
 });
@@ -58,7 +65,10 @@ adminRouter.get('/', requireAdmin, async (_req, res) => {
 adminRouter.get('/api/documents', requireAdmin, async (_req, res) => {
   const tenantId = res.locals.tenantId as string | null;
   if (!tenantId) {
-    res.status(400).json({ error: 'no tenant context — password sessions cannot list docs' });
+    sendError(res, 400, {
+      code: 'tenant-required',
+      message: 'Sign in with Google to see your knowledge base.',
+    });
     return;
   }
   res.json(await listDocuments(tenantId));
@@ -69,15 +79,24 @@ adminRouter.post('/api/documents', requireAdmin, csrfGuard, upload.single('file'
   const tenant = res.locals.tenant as Tenant | undefined;
   const adminEmail = (res.locals.adminEmail as string | null) ?? null;
   if (!tenantId || !tenant) {
-    res.status(400).json({ error: 'no tenant context — sign in with Google to upload' });
+    sendError(res, 400, {
+      code: 'tenant-required',
+      message: 'Sign in with Google to upload documents.',
+    });
     return;
   }
   if (!req.file) {
-    res.status(400).json({ error: 'no file uploaded' });
+    sendError(res, 400, {
+      code: 'validation-failed',
+      message: 'No file was attached. Choose a PDF and try again.',
+    });
     return;
   }
   if (!req.file.originalname.toLowerCase().endsWith('.pdf')) {
-    res.status(400).json({ error: 'only PDF files supported' });
+    sendError(res, 400, {
+      code: 'validation-failed',
+      message: 'Only PDF files are supported. Convert your document to PDF and upload again.',
+    });
     return;
   }
   try {
@@ -88,8 +107,11 @@ adminRouter.post('/api/documents', requireAdmin, csrfGuard, upload.single('file'
     );
     res.json(result);
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    sendError(res, 500, {
+      code: 'internal-error',
+      message: "We couldn't ingest that PDF. Try a different file, or contact support if it keeps failing.",
+      internal: err,
+    });
   }
 });
 
@@ -98,12 +120,18 @@ adminRouter.delete('/api/documents/:id', requireAdmin, csrfGuard, async (req, re
   const tenant = res.locals.tenant as Tenant | undefined;
   const adminEmail = (res.locals.adminEmail as string | null) ?? null;
   if (!tenantId || !tenant) {
-    res.status(400).json({ error: 'no tenant context' });
+    sendError(res, 400, {
+      code: 'tenant-required',
+      message: 'Sign in with Google to manage your knowledge base.',
+    });
     return;
   }
   const id = req.params.id;
   if (typeof id !== 'string' || !id) {
-    res.status(400).json({ error: 'missing id' });
+    sendError(res, 400, {
+      code: 'validation-failed',
+      message: 'Missing the document id. Refresh the page and try again.',
+    });
     return;
   }
   try {
@@ -113,15 +141,21 @@ adminRouter.delete('/api/documents/:id', requireAdmin, csrfGuard, async (req, re
     );
     res.json({ ok: true });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    res.status(500).json({ error: msg });
+    sendError(res, 500, {
+      code: 'internal-error',
+      message: "We couldn't delete that document. Please try again in a moment.",
+      internal: err,
+    });
   }
 });
 
 adminRouter.get('/api/messages', requireAdmin, async (_req, res) => {
   const tenantId = res.locals.tenantId as string | null;
   if (!tenantId) {
-    res.status(400).json({ error: 'no tenant context' });
+    sendError(res, 400, {
+      code: 'tenant-required',
+      message: 'Sign in with Google to see message activity.',
+    });
     return;
   }
   const { data, error } = await db()
@@ -131,7 +165,11 @@ adminRouter.get('/api/messages', requireAdmin, async (_req, res) => {
     .order('received_at', { ascending: false })
     .limit(100);
   if (error) {
-    res.status(500).json({ error: error.message });
+    sendError(res, 500, {
+      code: 'internal-error',
+      message: "We couldn't load recent activity. Please try again in a moment.",
+      internal: error,
+    });
     return;
   }
   res.json(data);
