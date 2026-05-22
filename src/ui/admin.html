@@ -965,24 +965,47 @@ function relativeTime(iso) {
   return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+function getCsrfTokenFromCookie() {
+  const m = document.cookie.match(/(?:^|;\s*)inbox_ai_csrf=([^;]+)/);
+  return m ? decodeURIComponent(m[1]) : '';
+}
+
 async function safeFetch(url, opts) {
-  const merged = { ...opts, headers: { Accept: 'application/json', ...(opts?.headers || {}) } };
+  const method = (opts?.method || 'GET').toUpperCase();
+  const headers = { Accept: 'application/json', ...(opts?.headers || {}) };
+  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
+    const csrf = getCsrfTokenFromCookie();
+    if (csrf) headers['X-CSRF-Token'] = csrf;
+  }
   let res;
   try {
-    res = await fetch(url, merged);
+    res = await fetch(url, { ...opts, headers });
   } catch (err) {
-    throw new Error(`Network error talking to ${url}: ${err.message || err}`);
+    throw new Error("Can't reach the server — check your internet connection and try again.");
   }
   if (res.status === 401) {
     window.location.href = '/admin/login';
-    throw new Error('Session expired — redirecting');
+    throw new Error('Your session has expired. Taking you back to sign-in…');
   }
   if (!res.ok) {
-    let detail = '';
-    try { detail = (await res.json()).error || ''; } catch { detail = await res.text().catch(() => ''); }
-    throw new Error(`${opts?.method || 'GET'} ${url} failed (HTTP ${res.status})${detail ? ': ' + detail : ''}`);
+    let body = null;
+    try { body = await res.json(); } catch { /* not json */ }
+    // Server returns { error: machine-code, message: user-friendly } on failure.
+    // Prefer message; fall back to a generic line so the UI never shows raw stack traces.
+    const friendly =
+      body?.message ||
+      (res.status === 403 ? 'You don\'t have permission to do that, or your session expired. Refresh the page and try again.'
+        : res.status === 404 ? 'We couldn\'t find what you were looking for. It may have been removed.'
+        : res.status === 429 ? 'You\'re sending requests too quickly. Wait a moment and try again.'
+        : res.status >= 500 ? 'Something went wrong on our end. Please try again in a moment.'
+        : body?.error || 'The request failed. Please try again.');
+    const err = new Error(friendly);
+    err.status = res.status;
+    err.code = body?.error || null;
+    throw err;
   }
-  return res.json();
+  // Some endpoints return 204 No Content; guard against res.json() throwing.
+  try { return await res.json(); } catch { return null; }
 }
 
 // ============ Router ============
@@ -1089,12 +1112,10 @@ async function loadStatus() {
       $('#settings-avatar').textContent = adminEmail.charAt(0);
       $('#settings-method').textContent = 'signed in via Google';
     } else {
-      $('#admin-email').textContent = 'admin';
-      $('#admin-avatar').textContent = 'A';
-      $('#admin-sub').textContent = 'password sign-in';
-      $('#settings-email').textContent = 'admin (password)';
-      $('#settings-avatar').textContent = 'A';
-      $('#settings-method').textContent = 'signed in via password';
+      // No email in session — cookie was tampered or session corrupted.
+      // requireAdmin would have already redirected; defensive fallback only.
+      window.location.href = '/admin/login';
+      return;
     }
     // Gmail status (rendered in two places)
     const statusHtml = data.gmail

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { requireAdmin } from '../lib/auth.js';
+import { requireAdmin, csrfGuard, issueCsrfToken } from '../lib/auth.js';
 import {
   updateSettings,
   markOnboardingComplete,
@@ -27,6 +27,7 @@ function requireTenant(res: import('express').Response): string | null {
 }
 
 onboardingRouter.get('/', requireAdmin, async (_req, res) => {
+  issueCsrfToken(res);
   const html = await readFile(path.join(__dirname, '..', 'ui', 'onboarding.html'), 'utf-8');
   res.type('html').send(html);
 });
@@ -76,7 +77,7 @@ onboardingRouter.get('/api/state', requireAdmin, async (_req, res) => {
   });
 });
 
-onboardingRouter.post('/api/welcome', requireAdmin, async (req, res) => {
+onboardingRouter.post('/api/welcome', requireAdmin, csrfGuard, async (req, res) => {
   const tenantId = requireTenant(res);
   if (!tenantId) return;
   const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
@@ -92,7 +93,7 @@ onboardingRouter.post('/api/welcome', requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
-onboardingRouter.post('/api/persona', requireAdmin, async (req, res) => {
+onboardingRouter.post('/api/persona', requireAdmin, csrfGuard, async (req, res) => {
   const tenantId = requireTenant(res);
   if (!tenantId) return;
   const { signature, tone, companyDescription } = req.body ?? {};
@@ -118,7 +119,7 @@ onboardingRouter.post('/api/persona', requireAdmin, async (req, res) => {
   }
 });
 
-onboardingRouter.post('/api/classifier', requireAdmin, async (req, res) => {
+onboardingRouter.post('/api/classifier', requireAdmin, csrfGuard, async (req, res) => {
   const tenantId = requireTenant(res);
   if (!tenantId) return;
   const prompt = typeof req.body?.prompt === 'string' ? req.body.prompt.trim() : '';
@@ -141,7 +142,7 @@ onboardingRouter.post('/api/classifier', requireAdmin, async (req, res) => {
   }
 });
 
-onboardingRouter.post('/api/complete', requireAdmin, async (_req, res) => {
+onboardingRouter.post('/api/complete', requireAdmin, csrfGuard, async (_req, res) => {
   const tenantId = requireTenant(res);
   if (!tenantId) return;
   try {
@@ -158,7 +159,7 @@ onboardingRouter.post('/api/complete', requireAdmin, async (_req, res) => {
 // 30 days) and clears the admin session cookie so the user lands on the
 // login screen. Only allowed while onboarding is incomplete — once a tenant
 // is in production we don't want a click to silently nuke it.
-onboardingRouter.post('/api/reset', requireAdmin, async (_req, res) => {
+onboardingRouter.post('/api/reset', requireAdmin, csrfGuard, async (_req, res) => {
   const tenantId = requireTenant(res);
   if (!tenantId) return;
   try {

@@ -1,16 +1,9 @@
 import { Router } from 'express';
 import multer from 'multer';
-import rateLimit from 'express-rate-limit';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import {
-  requireAdmin,
-  checkPassword,
-  issueSessionForPassword,
-  clearSession,
-  getSessionEmail,
-} from '../lib/auth.js';
+import { requireAdmin, clearSession, getSessionEmail, csrfGuard, issueCsrfToken } from '../lib/auth.js';
 import { ingestPdf, deleteDocument, listDocuments } from '../kb/ingest.js';
 import type { Tenant } from '../tenant/store.js';
 import { db } from '../db/client.js';
@@ -21,14 +14,6 @@ const upload = multer({
   limits: { fileSize: 25 * 1024 * 1024 },
 });
 
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  standardHeaders: true,
-  legacyHeaders: false,
-  message: { error: 'Too many login attempts. Try again in 15 minutes.' },
-});
-
 export const adminRouter: Router = Router();
 
 adminRouter.use('/api', (_req, res, next) => {
@@ -37,38 +22,24 @@ adminRouter.use('/api', (_req, res, next) => {
 });
 
 // ============================================================
-// Login page
+// Login page (Google sign-in only — no password fallback in SaaS mode)
 // ============================================================
 adminRouter.get('/login', async (_req, res) => {
   const html = await readFile(path.join(__dirname, '..', 'ui', 'login.html'), 'utf-8');
-  // Google sign-in is always enabled in SaaS mode (anyone can sign up)
-  res.type('html').send(html.replace('<!--GOOGLE_SIGNIN_ENABLED-->', 'true'));
+  res.type('html').send(html);
 });
 
-adminRouter.post('/login', loginLimiter, (req, res) => {
-  const pwd = typeof req.body?.password === 'string' ? req.body.password : '';
-  if (!checkPassword(pwd)) {
-    res.status(401).type('html').send(
-      `<div style="font-family:system-ui;padding:40px;max-width:520px;margin:60px auto;background:#fff;border:1px solid #fca5a5;border-radius:12px"><h2 style="margin-top:0;color:#dc2626">Wrong password</h2><p><a href="/admin/login" style="color:#4f46e5">Try again</a></p></div>`,
-    );
-    return;
-  }
-  issueSessionForPassword(res);
-  res.redirect('/admin');
-});
-
-adminRouter.post('/auth/logout', requireAdmin, (_req, res) => {
+// Logout is POST-only to prevent CSRF (image-tag forced-logout). Requires
+// a valid CSRF token from the dashboard, which is set when the page renders.
+adminRouter.post('/auth/logout', requireAdmin, csrfGuard, (_req, res) => {
   clearSession(res);
   res.json({ ok: true });
 });
 
-adminRouter.get('/auth/logout', (_req, res) => {
-  clearSession(res);
-  res.redirect('/admin/login');
-});
-
 // ============================================================
-// Dashboard page (forces onboarding if incomplete)
+// Dashboard page (forces onboarding if incomplete). Issues a CSRF token
+// cookie that the page's JS reads and echoes back via X-CSRF-Token header
+// on any state-changing API call.
 // ============================================================
 adminRouter.get('/', requireAdmin, async (_req, res) => {
   const tenant = res.locals.tenant as Tenant | undefined;
@@ -76,6 +47,7 @@ adminRouter.get('/', requireAdmin, async (_req, res) => {
     res.redirect('/admin/onboarding');
     return;
   }
+  issueCsrfToken(res);
   const html = await readFile(path.join(__dirname, '..', 'ui', 'admin.html'), 'utf-8');
   res.type('html').send(html);
 });
@@ -92,7 +64,7 @@ adminRouter.get('/api/documents', requireAdmin, async (_req, res) => {
   res.json(await listDocuments(tenantId));
 });
 
-adminRouter.post('/api/documents', requireAdmin, upload.single('file'), async (req, res) => {
+adminRouter.post('/api/documents', requireAdmin, csrfGuard, upload.single('file'), async (req, res) => {
   const tenantId = res.locals.tenantId as string | null;
   const tenant = res.locals.tenant as Tenant | undefined;
   const adminEmail = (res.locals.adminEmail as string | null) ?? null;
@@ -121,7 +93,7 @@ adminRouter.post('/api/documents', requireAdmin, upload.single('file'), async (r
   }
 });
 
-adminRouter.delete('/api/documents/:id', requireAdmin, async (req, res) => {
+adminRouter.delete('/api/documents/:id', requireAdmin, csrfGuard, async (req, res) => {
   const tenantId = res.locals.tenantId as string | null;
   const tenant = res.locals.tenant as Tenant | undefined;
   const adminEmail = (res.locals.adminEmail as string | null) ?? null;

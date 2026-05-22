@@ -11,8 +11,39 @@ import { startPoller } from './workers/poller.js';
 import { startCleanupCron } from './workers/cleanup.js';
 
 const app = express();
-app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: true }));
+
+// Security headers on every response. CSP keeps 'unsafe-inline' for style/script
+// because the admin UI uses inline <style>/<script> blocks; nonce-based tightening
+// is a separate hardening pass. Google Fonts is explicitly allowlisted.
+app.use((_req, res, next) => {
+  res.set(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com",
+      "img-src 'self' data:",
+      "connect-src 'self'",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; '),
+  );
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('X-Frame-Options', 'DENY');
+  res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.set('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  if (env.NODE_ENV === 'production') {
+    res.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
+
+// 256kb JSON cap limits DoS surface from oversize bodies. Multer (POST
+// /admin/api/documents) keeps its own 25 MB cap for PDF uploads.
+app.use(express.json({ limit: '256kb' }));
+app.use(express.urlencoded({ extended: true, limit: '256kb' }));
 app.use(cookieParser());
 
 app.use('/health', healthRouter);

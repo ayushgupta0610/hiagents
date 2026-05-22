@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAdmin } from '../lib/auth.js';
+import { requireAdmin, csrfGuard } from '../lib/auth.js';
 import { updateSettings, getTenant, softDeleteTenant } from '../tenant/store.js';
 import { audit } from '../tenant/audit.js';
 import { summarizeUsage } from '../tenant/usage.js';
@@ -85,7 +85,7 @@ function validatePatch(patch: SettingsPatch): string | null {
   return null;
 }
 
-settingsRouter.put('/', requireAdmin, async (req, res) => {
+settingsRouter.put('/', requireAdmin, csrfGuard, async (req, res) => {
   const tenantId = requireTenant(res);
   if (!tenantId) return;
   const patch = (req.body ?? {}) as SettingsPatch;
@@ -117,7 +117,7 @@ settingsRouter.get('/usage', requireAdmin, async (_req, res) => {
   }
 });
 
-settingsRouter.post('/account/delete', requireAdmin, async (_req, res) => {
+settingsRouter.post('/account/delete', requireAdmin, csrfGuard, async (_req, res) => {
   const tenantId = requireTenant(res);
   if (!tenantId) return;
   try {

@@ -16,9 +16,7 @@
     --text: #0f172a;
     --text-muted: #64748b;
     --primary: #4f46e5;
-    --primary-hover: #4338ca;
     --primary-soft: #eef2ff;
-    --danger: #dc2626;
     --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.04);
   }
   * { box-sizing: border-box; }
@@ -35,27 +33,16 @@
     padding: 24px;
     -webkit-font-smoothing: antialiased;
   }
-  .shell {
-    width: 100%;
-    max-width: 420px;
-  }
+  .shell { width: 100%; max-width: 420px; }
   .brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    justify-content: center;
-    margin-bottom: 28px;
-    color: var(--text);
+    display: flex; align-items: center; gap: 10px;
+    justify-content: center; margin-bottom: 28px;
   }
   .brand-mark {
-    width: 36px; height: 36px;
-    border-radius: 10px;
+    width: 36px; height: 36px; border-radius: 10px;
     background: linear-gradient(135deg, #4f46e5, #7c3aed);
     display: grid; place-items: center;
-    color: white;
-    font-weight: 700;
-    font-size: 16px;
-    letter-spacing: -0.5px;
+    color: white; font-weight: 700; font-size: 16px; letter-spacing: -0.5px;
     box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
   }
   .brand-name { font-size: 18px; font-weight: 600; letter-spacing: -0.2px; }
@@ -66,115 +53,25 @@
     padding: 32px;
     box-shadow: var(--shadow);
   }
-  h1 {
-    margin: 0 0 8px;
-    font-size: 22px;
-    font-weight: 600;
-    letter-spacing: -0.4px;
-  }
-  .sub {
-    margin: 0 0 24px;
-    color: var(--text-muted);
-    font-size: 14px;
-    line-height: 1.5;
-  }
+  h1 { margin: 0 0 8px; font-size: 22px; font-weight: 600; letter-spacing: -0.4px; }
+  .sub { margin: 0 0 24px; color: var(--text-muted); font-size: 14px; line-height: 1.5; }
   .google-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    width: 100%;
-    padding: 12px 16px;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; padding: 12px 16px;
     background: white;
     border: 1px solid var(--border-strong);
     border-radius: 10px;
-    font: inherit;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--text);
+    font: inherit; font-size: 14px; font-weight: 500; color: var(--text);
     cursor: pointer;
-    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+    transition: background 0.15s, border-color 0.15s;
+    text-decoration: none;
   }
   .google-btn:hover { background: #f8fafc; border-color: #94a3b8; }
   .google-btn:active { background: #f1f5f9; }
   .google-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
-  .divider {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin: 24px 0;
-    color: var(--text-muted);
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  .divider::before, .divider::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-  }
-  .password-toggle {
-    width: 100%;
-    background: transparent;
-    border: none;
-    color: var(--text-muted);
-    font: inherit;
-    font-size: 13px;
-    cursor: pointer;
-    padding: 8px;
-    text-align: center;
-  }
-  .password-toggle:hover { color: var(--text); }
-  .password-form {
-    display: none;
-    margin-top: 8px;
-  }
-  .password-form.open { display: block; }
-  label {
-    display: block;
-    font-size: 13px;
-    font-weight: 500;
-    margin-bottom: 6px;
-    color: var(--text);
-  }
-  input[type="password"] {
-    width: 100%;
-    padding: 10px 12px;
-    border: 1px solid var(--border-strong);
-    border-radius: 8px;
-    font: inherit;
-    font-size: 14px;
-    background: white;
-    color: var(--text);
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  input[type="password"]:focus {
-    outline: none;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
-  }
-  .submit {
-    width: 100%;
-    margin-top: 12px;
-    padding: 11px 16px;
-    background: var(--primary);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    font: inherit;
-    font-size: 14px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: background 0.15s;
-  }
-  .submit:hover { background: var(--primary-hover); }
   .footnote {
-    margin-top: 24px;
-    text-align: center;
-    color: var(--text-muted);
-    font-size: 12px;
-    line-height: 1.5;
+    margin-top: 24px; text-align: center;
+    color: var(--text-muted); font-size: 12px; line-height: 1.5;
   }
   .footnote a { color: var(--primary); text-decoration: none; }
   .footnote a:hover { text-decoration: underline; }
@@ -205,10 +102,10 @@
 
   <div class="card">
     <h1>Sign in</h1>
-    <p class="sub">Use your Gmail account, or fall back to the admin password.</p>
+    <p class="sub">Sign in with your Google account to access your inbox-ai workspace.</p>
 
     <div id="google-signin-block">
-      <a href="/oauth/signin" class="google-btn" id="google-btn" style="text-decoration:none">
+      <a href="/oauth/signin" class="google-btn">
         <svg viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <path fill="#4285F4" d="M16.51 8H8.98v3h4.3c-.18 1-.74 1.48-1.6 2.04v2.01h2.6a7.8 7.8 0 0 0 2.38-5.88c0-.57-.05-.66-.15-1.18Z"/>
           <path fill="#34A853" d="M8.98 17c2.16 0 3.97-.72 5.3-1.94l-2.6-2.04a4.8 4.8 0 0 1-7.18-2.54H1.83v2.07A8 8 0 0 0 8.98 17Z"/>
@@ -220,43 +117,14 @@
     </div>
 
     <div id="signin-disabled-block" class="signin-disabled" style="display:none">
-      Google sign-in is not configured on this deployment. Set <code>ADMIN_EMAILS</code> in the <code>.env</code> to enable it. Use the password below for now.
+      Google sign-in is not configured on this deployment. Set <code>GOOGLE_CLIENT_ID</code>,
+      <code>GOOGLE_CLIENT_SECRET</code>, and <code>GOOGLE_REDIRECT_URI</code> in <code>.env</code>.
     </div>
-
-    <div class="divider">or</div>
-
-    <button type="button" class="password-toggle" id="toggle-password">Sign in with admin password</button>
-
-    <form method="POST" action="/admin/login" class="password-form" id="password-form">
-      <label for="password">Password</label>
-      <input type="password" name="password" id="password" required autocomplete="current-password">
-      <button class="submit" type="submit">Sign in</button>
-    </form>
   </div>
 
   <p class="footnote">
     <a href="https://github.com/ayushgupta0610/inbox-ai" target="_blank" rel="noopener">inbox-ai</a> · AI email auto-responder
   </p>
 </div>
-
-<script>
-  // Server injects 'true' or 'false' below
-  const googleSigninEnabled = <!--GOOGLE_SIGNIN_ENABLED--> === true;
-  if (!googleSigninEnabled) {
-    document.getElementById('google-signin-block').style.display = 'none';
-    document.getElementById('signin-disabled-block').style.display = 'block';
-  }
-  const form = document.getElementById('password-form');
-  const toggle = document.getElementById('toggle-password');
-  toggle.addEventListener('click', () => {
-    form.classList.toggle('open');
-    toggle.textContent = form.classList.contains('open')
-      ? 'Hide password form'
-      : 'Sign in with admin password';
-    if (form.classList.contains('open')) {
-      document.getElementById('password').focus();
-    }
-  });
-</script>
 </body>
 </html>
