@@ -33,3 +33,22 @@ export async function audit(
     logger.error({ err: msg, tenantId, action }, 'audit log write failed');
   }
 }
+
+// Fire-and-forget audit for request handlers — same write but doesn't
+// block the HTTP response on a DB round-trip. audit() already catches its
+// own errors, so the explicit .catch is just belt-and-braces against the
+// "unhandled promise rejection" warning if that ever changes.
+//
+// Use this from routes that just want to record the event and return; use
+// `await audit(...)` from cron / batch paths where the surrounding process
+// might exit before a detached write would land.
+export function auditFireAndForget(
+  tenantId: string,
+  actorEmail: string | null,
+  action: AuditAction,
+  metadata?: Record<string, unknown>,
+): void {
+  void audit(tenantId, actorEmail, action, metadata).catch(() => {
+    /* swallowed; audit() already logged */
+  });
+}

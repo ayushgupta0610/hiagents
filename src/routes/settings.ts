@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAdmin, csrfGuard } from '../lib/auth.js';
 import { updateSettings, getTenant, softDeleteTenant } from '../tenant/store.js';
-import { audit } from '../tenant/audit.js';
+import { auditFireAndForget } from '../tenant/audit.js';
 import { summarizeUsage } from '../tenant/usage.js';
 import { sendError } from '../lib/errors.js';
 import {
@@ -130,7 +130,7 @@ settingsRouter.put('/', requireAdmin, csrfGuard, async (req, res) => {
   }
   try {
     const updated = await updateSettings(tenantId, parsed.data as Partial<TenantSettings>);
-    await audit(tenantId, res.locals.adminEmail ?? null, 'settings.updated', {
+    auditFireAndForget(tenantId, res.locals.adminEmail ?? null, 'settings.updated', {
       keys: Object.keys(parsed.data),
     });
     res.json({ settings: updated });
@@ -164,7 +164,7 @@ settingsRouter.post('/account/delete', requireAdmin, csrfGuard, async (_req, res
   if (!tenantId) return;
   try {
     await softDeleteTenant(tenantId);
-    await audit(tenantId, res.locals.adminEmail ?? null, 'tenant.soft_deleted', {});
+    auditFireAndForget(tenantId, res.locals.adminEmail ?? null, 'tenant.soft_deleted', {});
     res.json({ ok: true });
   } catch (e) {
     sendError(res, 500, {

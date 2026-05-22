@@ -9,7 +9,7 @@ import {
   getTenant,
   softDeleteTenant,
 } from '../tenant/store.js';
-import { audit } from '../tenant/audit.js';
+import { auditFireAndForget } from '../tenant/audit.js';
 import { clearSession } from '../lib/auth.js';
 import { sendError } from '../lib/errors.js';
 import { db } from '../db/client.js';
@@ -172,7 +172,7 @@ onboardingRouter.post('/api/complete', requireAdmin, csrfGuard, async (_req, res
   if (!tenantId) return;
   try {
     await markOnboardingComplete(tenantId);
-    await audit(tenantId, res.locals.adminEmail ?? null, 'onboarding.completed', {});
+    auditFireAndForget(tenantId, res.locals.adminEmail ?? null, 'onboarding.completed', {});
     res.json({ ok: true });
   } catch (e) {
     sendError(res, 500, {
@@ -206,7 +206,7 @@ onboardingRouter.post('/api/reset', requireAdmin, csrfGuard, async (_req, res) =
       return;
     }
     await softDeleteTenant(tenantId);
-    await audit(tenantId, res.locals.adminEmail ?? null, 'tenant.soft_deleted', {
+    auditFireAndForget(tenantId, res.locals.adminEmail ?? null, 'tenant.soft_deleted', {
       reason: 'onboarding-start-over',
     });
     clearSession(res);

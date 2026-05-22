@@ -55,24 +55,63 @@ function slugify(s: string): string {
   );
 }
 
+// In-process cache for findTenantForEmail. Every authenticated request
+// goes through requireAdmin → findTenantForEmail (a JOIN on memberships
+// + tenants), so caching here cuts ~80% of those round-trips during active
+// admin use. TTL is short (30s) so role/settings changes propagate quickly;
+// settings writes also call invalidateTenantCache() to make changes
+// instant for the editing user.
+type TenantCacheEntry = {
+  value: { tenant: Tenant; membership: Membership } | null;
+  expiresAt: number;
+};
+const TENANT_CACHE_TTL_MS = 30 * 1000;
+const tenantCacheByEmail = new Map<string, TenantCacheEntry>();
+const emailsByTenantId = new Map<string, Set<string>>();
+
+function cacheKey(email: string): string {
+  return email.toLowerCase();
+}
+
+function rememberMapping(email: string, tenantId: string): void {
+  const set = emailsByTenantId.get(tenantId) ?? new Set<string>();
+  set.add(cacheKey(email));
+  emailsByTenantId.set(tenantId, set);
+}
+
+export function invalidateTenantCache(tenantId: string): void {
+  const emails = emailsByTenantId.get(tenantId);
+  if (!emails) return;
+  for (const e of emails) tenantCacheByEmail.delete(e);
+  emailsByTenantId.delete(tenantId);
+}
+
 export async function findTenantForEmail(
   email: string,
 ): Promise<{ tenant: Tenant; membership: Membership } | null> {
+  const key = cacheKey(email);
+  const cached = tenantCacheByEmail.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
   const supabase = db();
   const { data, error } = await supabase
     .from('memberships')
     .select('*, tenants!inner(*)')
-    .eq('email', email.toLowerCase())
+    .eq('email', key)
     .is('tenants.deleted_at', null)
     .order('last_seen_at', { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle();
 
   if (error) throw new Error(`findTenantForEmail: ${error.message}`);
-  if (!data) return null;
+
+  if (!data) {
+    tenantCacheByEmail.set(key, { value: null, expiresAt: Date.now() + TENANT_CACHE_TTL_MS });
+    return null;
+  }
 
   const tenantRow = (data as { tenants: TenantRow }).tenants;
-  return {
+  const value = {
     tenant: rowToTenant(tenantRow),
     membership: {
       id: data.id,
@@ -83,6 +122,9 @@ export async function findTenantForEmail(
       lastSeenAt: data.last_seen_at,
     },
   };
+  tenantCacheByEmail.set(key, { value, expiresAt: Date.now() + TENANT_CACHE_TTL_MS });
+  rememberMapping(key, value.tenant.id);
+  return value;
 }
 
 export async function provisionTenant(email: string, displayName?: string): Promise<Tenant> {
@@ -144,6 +186,7 @@ export async function updateSettings(
   const merged = withDefaults({ ...tenant.settings, ...patch });
   const { error } = await db().from('tenants').update({ settings: merged }).eq('id', tenantId);
   if (error) throw new Error(`updateSettings: ${error.message}`);
+  invalidateTenantCache(tenantId);
   return merged;
 }
 
@@ -154,6 +197,7 @@ export async function markOnboardingComplete(tenantId: string): Promise<void> {
     .eq('id', tenantId)
     .is('onboarding_completed_at', null);
   if (error) throw new Error(`markOnboardingComplete: ${error.message}`);
+  invalidateTenantCache(tenantId);
 }
 
 export async function softDeleteTenant(tenantId: string): Promise<void> {
@@ -162,6 +206,7 @@ export async function softDeleteTenant(tenantId: string): Promise<void> {
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', tenantId);
   if (error) throw new Error(`softDeleteTenant: ${error.message}`);
+  invalidateTenantCache(tenantId);
 }
 
 export async function touchMembership(membershipId: string): Promise<void> {
@@ -171,12 +216,31 @@ export async function touchMembership(membershipId: string): Promise<void> {
     .eq('id', membershipId);
 }
 
+// Slim projection for the poller — the only callers that need the full Tenant
+// row are admin/UI paths (which fetch one tenant at a time via getTenant).
+// The poller's tick runs every 30-60s and reads N rows, so dropping the
+// unused columns (name, slug, created_at, created_by_email, deleted_at) keeps
+// per-tick payload small. `settings` is kept because the pipeline reads
+// persona/classifier/reply/retrieval/limits per message.
 export async function listOnboardedTenants(): Promise<Tenant[]> {
   const { data, error } = await db()
     .from('tenants')
-    .select('*')
+    .select('id, settings')
     .not('onboarding_completed_at', 'is', null)
     .is('deleted_at', null);
   if (error) throw new Error(`listOnboardedTenants: ${error.message}`);
-  return ((data as TenantRow[]) ?? []).map(rowToTenant);
+  type SlimRow = { id: string; settings: Partial<TenantSettings> | null };
+  return ((data as SlimRow[]) ?? []).map((r) => ({
+    id: r.id,
+    settings: withDefaults(r.settings),
+    // Filled with empty / null so the Tenant shape is preserved for
+    // downstream code that types against it. The poller and runPipeline
+    // only ever read id + settings.
+    name: '',
+    slug: '',
+    createdAt: '',
+    createdByEmail: null,
+    onboardingCompletedAt: null,
+    deletedAt: null,
+  }));
 }

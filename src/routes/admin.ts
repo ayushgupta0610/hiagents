@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { requireAdmin, clearSession, getSessionEmail, csrfGuard, issueCsrfToken } from '../lib/auth.js';
 import { sendError } from '../lib/errors.js';
 import { ingestPdf, deleteDocument, listDocuments } from '../kb/ingest.js';
-import { audit } from '../tenant/audit.js';
+import { auditFireAndForget } from '../tenant/audit.js';
 import type { Tenant } from '../tenant/store.js';
 import { db } from '../db/client.js';
 
@@ -37,7 +37,7 @@ adminRouter.post('/auth/logout', requireAdmin, csrfGuard, async (req, res) => {
   const tenantId = res.locals.tenantId as string | null;
   const adminEmail = (res.locals.adminEmail as string | null) ?? null;
   if (tenantId) {
-    await audit(tenantId, adminEmail, 'auth.signout', { ip: req.ip });
+    auditFireAndForget(tenantId, adminEmail, 'auth.signout', { ip: req.ip });
   }
   clearSession(res);
   res.json({ ok: true });

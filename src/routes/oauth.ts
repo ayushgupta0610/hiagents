@@ -8,10 +8,11 @@ import {
   saveTokensForTenant,
   buildMailboxAuthUrl,
   buildSigninAuthUrl,
+  clearLabelCacheForTenant,
 } from '../providers/gmail.js';
 import { requireAdmin, issueSessionForEmail } from '../lib/auth.js';
 import { findTenantForEmail, provisionTenant } from '../tenant/store.js';
-import { audit } from '../tenant/audit.js';
+import { auditFireAndForget } from '../tenant/audit.js';
 import { logger } from '../lib/logger.js';
 import { db } from '../db/client.js';
 import { env } from '../config.js';
@@ -171,14 +172,14 @@ oauthRouter.get('/callback', async (req, res) => {
       let found = await findTenantForEmail(email);
       if (!found) {
         const tenant = await provisionTenant(email);
-        await audit(tenant.id, email, 'tenant.provisioned', { via: 'google-signin' });
+        auditFireAndForget(tenant.id, email, 'tenant.provisioned', { via: 'google-signin' });
         logger.info({ email, tenantId: tenant.id }, 'auto-provisioned new tenant');
         issueSessionForEmail(res, email, tenant.id);
-        await audit(tenant.id, email, 'auth.signin', { method: 'google', ip: req.ip });
+        auditFireAndForget(tenant.id, email, 'auth.signin', { method: 'google', ip: req.ip });
         res.redirect('/admin/onboarding');
         return;
       }
-      await audit(found.tenant.id, email, 'auth.signin', { method: 'google', ip: req.ip });
+      auditFireAndForget(found.tenant.id, email, 'auth.signin', { method: 'google', ip: req.ip });
       issueSessionForEmail(res, email, found.tenant.id);
       res.redirect(found.tenant.onboardingCompletedAt ? '/admin' : '/admin/onboarding');
       return;
@@ -213,7 +214,11 @@ oauthRouter.get('/callback', async (req, res) => {
         },
         email,
       );
-      await audit(stateTenantId, email, 'gmail.connected', { ip: req.ip });
+      // If the user reconnected with a different Gmail, the cached label
+      // ids from the previous mailbox are now stale — drop them so the
+      // next applyLabel re-resolves against the new mailbox.
+      clearLabelCacheForTenant(stateTenantId);
+      auditFireAndForget(stateTenantId, email, 'gmail.connected', { ip: req.ip });
       logger.info({ email, tenantId: stateTenantId }, 'gmail mailbox connected');
 
       // Look up the tenant's onboarding state so we know where to send them.

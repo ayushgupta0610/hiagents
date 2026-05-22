@@ -236,31 +236,58 @@ export async function markRead(tenantId: string, messageId: string): Promise<voi
   });
 }
 
+// Per-tenant cache of Gmail label name → id. Label ids are stable for the
+// life of the mailbox; without this cache, every applyLabel call burns an
+// extra users.labels.list quota unit (2× the cost of the modify itself).
+// The cache only ever grows by labels we ourselves create, so it's tiny
+// (handful of `inbox-ai/*` labels per tenant).
+const labelIdCache = new Map<string, Map<string, string>>();
+
+function getLabelCache(tenantId: string): Map<string, string> {
+  let m = labelIdCache.get(tenantId);
+  if (!m) {
+    m = new Map();
+    labelIdCache.set(tenantId, m);
+  }
+  return m;
+}
+
 export async function applyLabel(
   tenantId: string,
   messageId: string,
   labelName: string,
 ): Promise<void> {
   const gmail = await getGmailClientForTenant(tenantId);
-  const labels = await gmail.users.labels.list({ userId: 'me' });
-  let labelId = labels.data.labels?.find((l) => l.name === labelName)?.id ?? undefined;
+  const cache = getLabelCache(tenantId);
+  let labelId = cache.get(labelName);
   if (!labelId) {
-    const created = await gmail.users.labels.create({
-      userId: 'me',
-      requestBody: {
-        name: labelName,
-        labelListVisibility: 'labelShow',
-        messageListVisibility: 'show',
-      },
-    });
-    if (!created.data.id) throw new Error(`Failed to create label ${labelName}`);
-    labelId = created.data.id;
+    const labels = await gmail.users.labels.list({ userId: 'me' });
+    labelId = labels.data.labels?.find((l) => l.name === labelName)?.id ?? undefined;
+    if (!labelId) {
+      const created = await gmail.users.labels.create({
+        userId: 'me',
+        requestBody: {
+          name: labelName,
+          labelListVisibility: 'labelShow',
+          messageListVisibility: 'show',
+        },
+      });
+      if (!created.data.id) throw new Error(`Failed to create label ${labelName}`);
+      labelId = created.data.id;
+    }
+    cache.set(labelName, labelId);
   }
   await gmail.users.messages.modify({
     userId: 'me',
     id: messageId,
     requestBody: { addLabelIds: [labelId] },
   });
+}
+
+// Clears the in-process label-id cache for a tenant. Called when a user
+// reconnects their mailbox (different Gmail account = different label ids).
+export function clearLabelCacheForTenant(tenantId: string): void {
+  labelIdCache.delete(tenantId);
 }
 
 export interface SendReplyInput {

@@ -152,11 +152,21 @@ export async function runPipeline(ctx: RunContext, email: IncomingEmail): Promis
   }
 
   try {
-    const verdict = await classify(tenantId, settings, {
+    // Run classifier + inbound risk concurrently. Both take ~600ms and are
+    // independent. Cost trade-off: on classifier='other' emails we waste a
+    // single risk LLM call (the same model size as the classifier), in
+    // exchange for halving wall-clock for every email that does proceed —
+    // worthwhile because the happy path is the common case and the noise
+    // path is bounded by the daily spend cap anyway.
+    const emailMeta = {
       from: email.from,
       subject: email.subject,
       bodyText: email.bodyText,
-    });
+    };
+    const [verdict, risk] = await Promise.all([
+      classify(tenantId, settings, emailMeta),
+      assessInboundRisk(tenantId, settings, emailMeta),
+    ]);
     if (verdict === 'other') {
       await supabase.from('messages').insert({
         ...baseRow,
@@ -170,11 +180,6 @@ export async function runPipeline(ctx: RunContext, email: IncomingEmail): Promis
     // Inbound risk gate — never auto-reply to threats, prompt-injection,
     // abuse, fraud patterns, or legal language. Operator sees these in
     // Activity as 'skipped' with reply_reason explaining why.
-    const risk = await assessInboundRisk(tenantId, settings, {
-      from: email.from,
-      subject: email.subject,
-      bodyText: email.bodyText,
-    });
     if (risk.verdict === 'unsafe') {
       logger.warn(
         { tenantId, id: email.gmailMessageId, reason: risk.reason },
