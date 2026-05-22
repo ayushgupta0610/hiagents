@@ -1,23 +1,15 @@
 // src/tenant/types.ts
 
-// Curated list of allowed reply models (prevents tenants from picking expensive Opus etc.)
-export const ALLOWED_REPLY_MODELS = [
-  'deepseek/deepseek-v4-flash',
-  'google/gemini-3.5-flash',
-  'anthropic/claude-haiku-4.5',
-  'anthropic/claude-sonnet-4.5',
-  'openai/gpt-4o-mini',
-] as const;
-
-export const ALLOWED_CLASSIFIER_MODELS = [
-  'openai/gpt-4o-mini',
-  'google/gemini-3.5-flash',
-  'anthropic/claude-haiku-4.5',
-  'deepseek/deepseek-v4-flash',
-] as const;
-
-export type ReplyModel = typeof ALLOWED_REPLY_MODELS[number];
-export type ClassifierModel = typeof ALLOWED_CLASSIFIER_MODELS[number];
+// Model selection is operator-controlled, not per-tenant. The fixed
+// defaults live in defaultTenantSettings() below; tenants don't pick
+// (no dropdown in the UI, no `reply.model` / `classifier.model` in the
+// settings PUT schema). To change the model used, edit the defaults
+// here and redeploy.
+//
+// The `string` types are kept (rather than literal unions) so historical
+// settings rows written before this change still type-check on read.
+export type ReplyModel = string;
+export type ClassifierModel = string;
 
 export interface TenantSettings {
   persona: {

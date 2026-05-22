@@ -5,12 +5,7 @@ import { updateSettings, getTenant, softDeleteTenant } from '../tenant/store.js'
 import { auditFireAndForget } from '../tenant/audit.js';
 import { summarizeUsage } from '../tenant/usage.js';
 import { sendError } from '../lib/errors.js';
-import {
-  ALLOWED_REPLY_MODELS,
-  ALLOWED_CLASSIFIER_MODELS,
-  defaultTenantSettings,
-  type TenantSettings,
-} from '../tenant/types.js';
+import { defaultTenantSettings, type TenantSettings } from '../tenant/types.js';
 
 export const settingsRouter: Router = Router();
 
@@ -41,10 +36,6 @@ settingsRouter.get('/', requireAdmin, async (_req, res) => {
   }
   res.json({
     settings: tenant.settings,
-    allowed: {
-      replyModels: ALLOWED_REPLY_MODELS,
-      classifierModels: ALLOWED_CLASSIFIER_MODELS,
-    },
     defaults: defaultTenantSettings(),
   });
 });
@@ -64,17 +55,11 @@ const personaPatchSchema = z
   .strict()
   .partial();
 
+// Classifier accepts only the prompt override now — the model is fixed
+// (defaultTenantSettings().classifier.model) and not tenant-tunable.
 const classifierPatchSchema = z
   .object({
-    model: z.enum(ALLOWED_CLASSIFIER_MODELS),
     prompt: z.string().max(2000).nullable(),
-  })
-  .strict()
-  .partial();
-
-const replyPatchSchema = z
-  .object({
-    model: z.enum(ALLOWED_REPLY_MODELS),
   })
   .strict()
   .partial();
@@ -100,11 +85,12 @@ const pollingPatchSchema = z
 // (daily email cap, spend cap, etc.) are operator-controlled to keep
 // tenants from raising their own ceilings via the API. If we ever ship a
 // "billing tier" UI, that should write to a separate path.
+// reply.* is intentionally excluded — the reply model is operator-controlled,
+// edit defaultTenantSettings() and redeploy if you want to change it.
 const settingsPatchSchema = z
   .object({
     persona: personaPatchSchema,
     classifier: classifierPatchSchema,
-    reply: replyPatchSchema,
     retrieval: retrievalPatchSchema,
     polling: pollingPatchSchema,
   })

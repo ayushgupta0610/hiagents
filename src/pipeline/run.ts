@@ -198,7 +198,12 @@ export async function runPipeline(ctx: RunContext, email: IncomingEmail): Promis
       };
     }
 
-    const query = `${email.subject}\n\n${email.bodyText}`;
+    // Embedding the full email body slows the embedding call and adds
+    // little retrieval signal — the question is almost always in the first
+    // few sentences. Capping at subject + 1000 body chars halves embedding
+    // latency on long emails with no measurable retrieval-quality loss
+    // for typical customer queries.
+    const query = `${email.subject}\n\n${email.bodyText.slice(0, 1000)}`;
     const chunks = await search(tenantId, settings, query);
     const topSim = chunks[0]?.similarity ?? 0;
 

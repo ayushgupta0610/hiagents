@@ -825,19 +825,9 @@
         </div>
 
         <div class="card">
-          <div class="card-header"><div><h2>Models & retrieval</h2><p class="sub">Which LLMs the bot uses and how strict retrieval is.</p></div></div>
+          <div class="card-header"><div><h2>Retrieval</h2><p class="sub">How strict knowledge-base retrieval is for grounding replies.</p></div></div>
           <div class="card-body">
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-              <div>
-                <label style="font-size:13px;font-weight:500;margin-bottom:6px;display:block">Reply model</label>
-                <select id="set-reply-model" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:6px;font:inherit;font-size:13px;background:white"></select>
-              </div>
-              <div>
-                <label style="font-size:13px;font-weight:500;margin-bottom:6px;display:block">Classifier model</label>
-                <select id="set-classifier-model" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:6px;font:inherit;font-size:13px;background:white"></select>
-              </div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px">
               <div>
                 <label style="font-size:13px;font-weight:500;margin-bottom:6px;display:block">Similarity threshold (0-1)</label>
                 <input id="set-threshold" type="number" min="0" max="1" step="0.05" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:6px;font:inherit;font-size:13px">
@@ -847,7 +837,7 @@
                 <input id="set-topk" type="number" min="1" max="50" style="width:100%;padding:9px 11px;border:1px solid var(--border-strong);border-radius:6px;font:inherit;font-size:13px">
               </div>
             </div>
-            <button class="btn btn-primary" id="save-models" style="margin-top:16px">Save models & retrieval</button>
+            <button class="btn btn-primary" id="save-retrieval" style="margin-top:16px">Save retrieval</button>
           </div>
         </div>
 
@@ -1367,7 +1357,7 @@ async function refreshDocs() {
 async function loadSettings() {
   if (location.hash !== '#settings') return;
   try {
-    const { settings, allowed } = await safeFetch('/admin/api/settings/');
+    const { settings } = await safeFetch('/admin/api/settings/');
     $('#set-tone').value = settings.persona.tone;
     $('#set-signature').value = settings.persona.signature;
     $('#set-company').value = settings.persona.companyDescription;
@@ -1375,19 +1365,6 @@ async function loadSettings() {
     $('#set-topk').value = settings.retrieval.topK;
     $('#set-classifier-prompt').value = settings.classifier.prompt ?? '';
     $('#set-auto-send').checked = settings.polling.autoSend;
-
-    const replySel = $('#set-reply-model'); replySel.innerHTML = '';
-    for (const m of allowed.replyModels) {
-      const o = document.createElement('option');
-      o.value = m; o.textContent = m; o.selected = m === settings.reply.model;
-      replySel.appendChild(o);
-    }
-    const classSel = $('#set-classifier-model'); classSel.innerHTML = '';
-    for (const m of allowed.classifierModels) {
-      const o = document.createElement('option');
-      o.value = m; o.textContent = m; o.selected = m === settings.classifier.model;
-      classSel.appendChild(o);
-    }
 
     const usage = await safeFetch('/admin/api/settings/usage');
     $('#usage-summary').innerHTML = `
@@ -1410,11 +1387,9 @@ async function saveSettings(patch, msg) {
 $('#save-persona')?.addEventListener('click', () => saveSettings({
   persona: { tone: $('#set-tone').value, signature: $('#set-signature').value, companyDescription: $('#set-company').value },
 }, 'Persona'));
-$('#save-models')?.addEventListener('click', () => saveSettings({
-  reply: { model: $('#set-reply-model').value },
-  classifier: { model: $('#set-classifier-model').value, prompt: $('#set-classifier-prompt').value || null },
+$('#save-retrieval')?.addEventListener('click', () => saveSettings({
   retrieval: { similarityThreshold: parseFloat($('#set-threshold').value), topK: parseInt($('#set-topk').value, 10) },
-}, 'Models & retrieval'));
+}, 'Retrieval'));
 $('#save-classifier-prompt')?.addEventListener('click', () => saveSettings({
   classifier: { prompt: $('#set-classifier-prompt').value || null },
 }, 'Classifier prompt'));
