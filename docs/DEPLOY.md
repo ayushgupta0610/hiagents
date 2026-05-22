@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - A VPS with a public IP (Hostinger VPS works).
-- A domain (or subdomain) pointed at the VPS IP via an A record (e.g., `bot.clientdomain.com` → `198.51.100.7`).
+- A domain (or subdomain) pointed at the VPS IP via an A record (e.g., `app.<client-slug>.hiagents.digital` → `198.51.100.7`).
 - A Supabase project (free tier is fine to start).
 - Docker + Docker Compose installed on the VPS.
 - A Google Cloud OAuth client (see [GMAIL-OAUTH-SETUP.md](GMAIL-OAUTH-SETUP.md)).
@@ -12,8 +12,8 @@
 
 If you're hosting deployments for multiple clients, host each on a subdomain of **your** domain (not the client's), e.g.:
 
-- `bot-acme.aiagencycorp.com` → Acme's deployment
-- `bot-foo.aiagencycorp.com` → Foo's deployment
+- `app-acme.hiagents.digital` → Acme's deployment
+- `app-foo.hiagents.digital` → Foo's deployment
 
 This means YOU add the DNS A record (zero friction for the client) and you control the SSL termination. The client only needs to (a) click "Connect Gmail" in the admin UI and (b) drop their PDFs in. No DNS, no infrastructure on their side.
 
@@ -42,8 +42,8 @@ docker compose version
 
 ```bash
 # On the VPS
-git clone https://github.com/<your-org>/inbox-ai.git
-cd inbox-ai
+git clone https://github.com/<your-org>/hiagents.git
+cd hiagents
 
 # Configure
 cp .env.example .env
@@ -64,7 +64,7 @@ Caddy will auto-provision a Let's Encrypt cert on first request to your `DOMAIN`
 
 ## Connect Gmail
 
-1. Open `https://bot.<yourdomain>.com/admin/login`.
+1. Open `https://app.hiagents.digital/admin/login`.
 2. Sign in with Google (Google sign-in is the only way in — no password fallback).
 3. A new workspace is auto-provisioned on first signin; the onboarding wizard runs.
 4. In the wizard's Mailbox step, click "Connect Gmail" and complete the OAuth consent (the unverified-app warning is expected until you submit for verification — see GMAIL-OAUTH-SETUP.md).
@@ -82,7 +82,7 @@ Send a test email from a different address to your mailbox with a question that 
 ## Updating
 
 ```bash
-cd inbox-ai
+cd hiagents
 git pull
 docker compose up -d --build
 ```
@@ -121,7 +121,7 @@ The app installs SIGTERM and SIGINT handlers (`src/server.ts`) that stop accepti
 // ecosystem.config.cjs
 module.exports = {
   apps: [{
-    name: 'inbox-ai',
+    name: 'hiagents',
     script: 'dist/server.js',
     instances: 1,
     autorestart: true,
@@ -137,14 +137,14 @@ Without this, `pm2 reload` cuts in-flight HTTP responses mid-stream and can inte
 
 ## SaaS-mode deployment notes
 
-inbox-ai is now multi-tenant. A single deployment serves N tenants. Steps that change from the single-tenant guide:
+hiagents is now multi-tenant. A single deployment serves N tenants. Steps that change from the single-tenant guide:
 
 - **No `ADMIN_EMAILS` env var.** Anyone with a Google account can sign in and gets an auto-provisioned tenant.
 - **No `ADMIN_PASSWORD` env var either.** The password fallback login is gone — Google sign-in is the only way in. Replaced by `SESSION_SECRET` (for HMAC) and `TOKEN_ENCRYPTION_KEY` (for OAuth-token AES encryption).
 - **No tenant-specific persona / threshold env vars.** Per-tenant config lives in the `tenants.settings` JSONB column and is edited via the Settings UI. The env-level defaults (`SIMILARITY_THRESHOLD`, `TONE`, `SIGNATURE`, `COMPANY_DESCRIPTION`, etc.) are NO LONGER read by the running pipeline — only `defaultTenantSettings()` in code matters.
 - **Reply + classifier model are deployment-wide.** Tenants don't pick — there's no model dropdown in Settings anymore. To change the model, edit `defaultTenantSettings()` in `src/tenant/types.ts` and redeploy.
-- **Single deployment, single domain.** All tenants share `bot.aiagencycorp.com`. Tenant context is derived from the signed-in user's email.
-- **Pre-add OAuth redirect URI**: `https://bot.aiagencycorp.com/oauth/callback` (just one — used for both sign-in and mailbox-connect flows, disambiguated via `state` param).
+- **Single deployment, single domain.** All tenants share `app.hiagents.digital`. Tenant context is derived from the signed-in user's email.
+- **Pre-add OAuth redirect URI**: `https://app.hiagents.digital/oauth/callback` (just one — used for both sign-in and mailbox-connect flows, disambiguated via `state` param).
 - **Run migration 002** in the Supabase SQL editor before redeploying — see [MIGRATION-002-RUNBOOK.md](MIGRATION-002-RUNBOOK.md).
 - **One Supabase project**, no longer one-per-client. RLS + per-query tenant scoping enforce isolation.
 - **New routes mounted in `server.ts`**: `/admin/api/settings` (settings + usage + delete) and `/admin/onboarding` (wizard).
@@ -174,8 +174,8 @@ Every query that touches a per-tenant table is filtered by `tenant_id` in code. 
 ## OAuth verification
 
 In SaaS mode every new tenant sees Google's "Google hasn't verified this app" warning during sign-in. Submit the OAuth consent screen for verification before any real marketing push:
-1. Privacy policy URL (host on `aiagencycorp.com/privacy`)
-2. Terms of service URL (`aiagencycorp.com/terms`)
+1. Privacy policy URL (host on `hiagents.digital/privacy`)
+2. Terms of service URL (`hiagents.digital/terms`)
 3. Demo video showing data use
 4. Wait ~4-6 weeks for review
 

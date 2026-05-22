@@ -4,7 +4,7 @@ import { env } from '../config.js';
 import { findTenantForEmail, touchMembership } from '../tenant/store.js';
 import { sendError } from './errors.js';
 
-const COOKIE = 'inbox_ai_admin';
+const COOKIE = 'hiagents_admin';
 
 // Reject cookies older than this even if the signature is valid. Browser
 // maxAge is enforced client-side; this is the server-side belt.
@@ -120,7 +120,7 @@ export function getSessionEmail(req: Request): string | null {
 // a non-httpOnly cookie and echoes via header X-CSRF-Token; server verifies.
 // ============================================================
 
-const CSRF_COOKIE = 'inbox_ai_csrf';
+const CSRF_COOKIE = 'hiagents_csrf';
 
 export function issueCsrfToken(res: Response): string {
   const nonce = Date.now().toString(36) + Math.random().toString(36).slice(2);

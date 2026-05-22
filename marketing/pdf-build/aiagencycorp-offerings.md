@@ -43,7 +43,7 @@ This catalog is what we do, why each thing matters, what it costs to run, and ho
 3. **Service catalog overview** — every offering at a glance
 4. **Browser & web automation** — OpenClaw, Hermes, custom scrapers
 5. **Voice agents** — inbound, outbound, in-language
-6. **Email automation** — including our own inbox-ai product
+6. **Email automation** — including our own hiagents product
 7. **Document & knowledge AI** — RAG, search, contract intelligence
 8. **Workflow & integration glue** — n8n, Zapier replacements, custom APIs
 9. **Customer support automation** — triage, tier-1 deflection, escalation routing
@@ -238,9 +238,9 @@ We do not show this number to over-promise. We show it because the math is what 
 
 Email is where most service businesses lose the most hours. People type the same response twenty-five times a day, get to inbox-zero on Friday at six, and start over Monday at eight. We automate that.
 
-### Our flagship product: inbox-ai
+### Our flagship product: hiagents
 
-inbox-ai is our own multi-tenant SaaS that we operate for clients. It is an AI auto-responder for client and customer queries that:
+hiagents is our own multi-tenant SaaS that we operate for clients. It is an AI auto-responder for client and customer queries that:
 
 - Connects to your Gmail (or Workspace) via OAuth.
 - Polls your inbox every minute for new mail.
@@ -250,9 +250,9 @@ inbox-ai is our own multi-tenant SaaS that we operate for clients. It is an AI a
 - Sends — or drafts, your choice — the reply in-thread.
 - Logs every step for audit and review.
 
-We built inbox-ai because we needed it ourselves. Our agency mailbox was getting forty-plus client questions a week and the team was answering each one from scratch. We are now signing up other agencies, law firms, real-estate brokers, and SaaS support teams to the same tool.
+We built hiagents because we needed it ourselves. Our agency mailbox was getting forty-plus client questions a week and the team was answering each one from scratch. We are now signing up other agencies, law firms, real-estate brokers, and SaaS support teams to the same tool.
 
-### What inbox-ai does not do
+### What hiagents does not do
 
 It will not invent answers. If your knowledge base does not cover a question, the bot will not reply — it tags the email and waits for a human. We made that decision early because we have seen too many auto-responders confidently make things up and lose customers permanently.
 
@@ -262,7 +262,7 @@ It will not handle complex multi-turn negotiations. Auto-responders are for ques
 
 ### Custom email automation for higher-stakes flows
 
-inbox-ai is the off-the-shelf version. For clients with more complex needs we build custom email pipelines. Examples:
+hiagents is the off-the-shelf version. For clients with more complex needs we build custom email pipelines. Examples:
 
 - **Refund triage for an e-commerce business.** Inbound refund requests are parsed, the order is looked up in Shopify, the reason is classified, and the system either auto-issues the refund (small dollar, policy-compliant), escalates to a human (larger dollar or edge-case), or replies with a clarifying question. Built for one client in three weeks, handles ~600 refund requests a week, escalates 12% to humans.
 - **Vendor onboarding email coordination.** A new vendor sends contract paperwork. The system extracts the relevant fields, populates the internal record, sends back the next form, and chases on a cadence if the vendor goes silent. Reduced average vendor-onboarding time from 11 days to 3.
@@ -270,7 +270,7 @@ inbox-ai is the off-the-shelf version. For clients with more complex needs we bu
 
 ### Pricing
 
-inbox-ai (managed SaaS): pilot is $1,500 for the first month, then $400/month flat for SMB use, plus LLM usage at cost (typically $20–$80/month for a normal inbox).
+hiagents (managed SaaS): pilot is $1,500 for the first month, then $400/month flat for SMB use, plus LLM usage at cost (typically $20–$80/month for a normal inbox).
 
 Custom email pipelines: $6,000–$25,000 build depending on complexity, $200–$800/month to run.
 

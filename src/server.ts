@@ -85,7 +85,7 @@ const errorHandler: express.ErrorRequestHandler = (err, req, res, _next) => {
 app.use(errorHandler);
 
 const server = app.listen(env.PORT, () => {
-  logger.info({ port: env.PORT, baseUrl: env.BASE_URL }, 'inbox-ai server listening');
+  logger.info({ port: env.PORT, baseUrl: env.BASE_URL }, 'hiagents server listening');
   startPoller();
   startCleanupCron();
 });

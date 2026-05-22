@@ -41,7 +41,7 @@ order by created_at desc;
 
 Cookie format: `<ts>.<base64(email)>.<base64(tenantId)>.<HMAC>`. HMAC uses `SESSION_SECRET` (≥32 chars; generate with `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`). `requireAdmin` validates HMAC, enforces a server-side max-age of 7 days (a leaked-but-unrotated cookie is refused even if the signature is intact), and pulls fresh membership data on every request — revoking a membership invalidates the cookie on next request, capped by the 30-second in-process tenant cache.
 
-A second non-httpOnly cookie `inbox_ai_csrf` holds a HMAC-signed CSRF token that the admin UI echoes via `X-CSRF-Token` on every state-changing request. `csrfGuard` middleware rejects POST/PUT/DELETE without a matching pair.
+A second non-httpOnly cookie `hiagents_csrf` holds a HMAC-signed CSRF token that the admin UI echoes via `X-CSRF-Token` on every state-changing request. `csrfGuard` middleware rejects POST/PUT/DELETE without a matching pair.
 
 ## OAuth state nonce
 

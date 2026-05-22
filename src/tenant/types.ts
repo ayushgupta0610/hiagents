@@ -45,7 +45,7 @@ export interface TenantSettings {
 export function defaultTenantSettings(): TenantSettings {
   return {
     persona: {
-      signature: '— Sent by inbox-ai',
+      signature: '— Sent by hiagents',
       tone: 'professional, warm, concise',
       companyDescription: '',
     },

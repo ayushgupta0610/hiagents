@@ -49,7 +49,7 @@ function escapeHtml(value: string): string {
 // max-age (long enough for the user to complete the Google consent screen,
 // short enough to limit the attack window).
 
-const STATE_COOKIE = 'inbox_ai_oauth_state';
+const STATE_COOKIE = 'hiagents_oauth_state';
 const STATE_MAX_AGE_MS = 10 * 60 * 1000;
 
 function signState(payload: string): string {

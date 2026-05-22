@@ -33,7 +33,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
       'HTTP-Referer': env.BASE_URL,
-      'X-Title': 'inbox-ai',
+      'X-Title': 'hiagents',
     },
     body: JSON.stringify(body),
   });

@@ -5,14 +5,14 @@ You set up the OAuth app **once** in your own Google Cloud account. All client d
 ## 1. Create a Google Cloud project
 
 1. Go to https://console.cloud.google.com/
-2. Create a new project (e.g. "inbox-ai").
+2. Create a new project (e.g. "hiagents").
 3. Enable the **Gmail API**: APIs & Services → Library → search "Gmail API" → Enable.
 
 ## 2. Configure OAuth consent screen
 
 1. APIs & Services → OAuth consent screen.
 2. User Type: **External**.
-3. App name: "inbox-ai" (or whatever you want clients to see).
+3. App name: "hiagents" (or whatever you want clients to see).
 4. User support email + developer contact: your email.
 5. **Scopes** → Add the following:
    - `https://www.googleapis.com/auth/gmail.readonly`
@@ -26,7 +26,7 @@ You set up the OAuth app **once** in your own Google Cloud account. All client d
 1. APIs & Services → Credentials → Create Credentials → OAuth client ID.
 2. Application type: **Web application**.
 3. Authorized redirect URIs: add **every** client's callback URL. For each deployment:
-   - `https://bot.<clientdomain>.com/oauth/callback`
+   - `https://app.<client-slug>.hiagents.digital/oauth/callback`
 4. Save. Copy `Client ID` and `Client secret` into each deployment's `.env`:
    - `GOOGLE_CLIENT_ID`
    - `GOOGLE_CLIENT_SECRET`
@@ -35,8 +35,8 @@ You set up the OAuth app **once** in your own Google Cloud account. All client d
 
 1. Add the client's Gmail to "Test users" in your consent screen (until you submit for verification).
 2. Add `https://bot-<clientname>.<yourdomain>.com/oauth/callback` to "Authorized redirect URIs" (use a subdomain of YOUR domain so the client doesn't have to set up DNS — see DEPLOY.md's "Recommended hosting pattern").
-3. After deploying their stack, have them visit `https://bot.<clientdomain>.com/admin`, log in, and click "Connect Gmail".
-4. They'll see a Google warning ("Google hasn't verified this app") because the app is unverified — click **Advanced → Go to inbox-ai (unsafe)**. This is normal for unverified internal apps.
+3. After deploying their stack, have them visit `https://app.<client-slug>.hiagents.digital/admin`, log in, and click "Connect Gmail".
+4. They'll see a Google warning ("Google hasn't verified this app") because the app is unverified — click **Advanced → Go to hiagents (unsafe)**. This is normal for unverified internal apps.
 5. They grant the scopes. Refresh token is stored in Supabase `oauth_tokens` table.
 
 ## 5. (Later) Submitting for verification

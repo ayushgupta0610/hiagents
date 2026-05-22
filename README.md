@@ -1,4 +1,4 @@
-# inbox-ai
+# hiagents
 
 Multi-tenant SaaS that auto-replies to client emails using a PDF-backed knowledge base. Anyone with a Google account can sign up, gets their own auto-provisioned workspace, configures their bot via a wizard, and operates fully isolated from every other tenant — all on a single deployment.
 
@@ -15,7 +15,7 @@ Per tenant, the bot polls Gmail every 60s and for each new email:
 5. **Generate** — the deployment's reply model (default `deepseek/deepseek-v4-flash`) drafts a reply grounded in the retrieved chunks + the tenant's persona settings. The system prompt explicitly treats KB context as untrusted data.
 6. **Moderate** — a final pass blocks toxic, legally-risky, or PII-leaking replies before send.
 7. **Send** — Gmail API sends the reply in-thread, with header sanitization on `To` / `Subject` / `In-Reply-To` to prevent header injection from attacker-controlled inbound mail. (Or saves as a draft if `autoSend=false`.)
-8. **Label + audit** — apply `inbox-ai/replied` label; log the full decision trail to `messages` (scoped to tenant) and every LLM call to `llm_usage` for cost attribution.
+8. **Label + audit** — apply `hiagents/replied` label; log the full decision trail to `messages` (scoped to tenant) and every LLM call to `llm_usage` for cost attribution.
 
 If retrieval finds nothing above the tenant's similarity threshold, the bot does NOT reply (logged as `no-kb-match`).
 
@@ -27,11 +27,11 @@ The poll tick processes up to 10 tenants concurrently and gracefully drains on S
 2. Apply Supabase migrations in order: `001_init.sql`, then `002_multi_tenant.sql` (see `docs/MIGRATION-002-RUNBOOK.md`).
 3. Set up Google OAuth — see [docs/GMAIL-OAUTH-SETUP.md](docs/GMAIL-OAUTH-SETUP.md).
 4. Deploy — see [docs/DEPLOY.md](docs/DEPLOY.md).
-5. Open `https://bot.<yourdomain>.com/admin/login` and sign in with Google. You'll be auto-provisioned a tenant and walked through the onboarding wizard.
+5. Open `https://app.hiagents.digital/admin/login` and sign in with Google. You'll be auto-provisioned a tenant and walked through the onboarding wizard.
 
 ## How a new user signs up
 
-1. Visit `https://bot.<yourdomain>.com/admin/login`
+1. Visit `https://app.hiagents.digital/admin/login`
 2. Click "Continue with Google"
 3. New email → new tenant + owner membership auto-provisioned
 4. Walked through the onboarding wizard:

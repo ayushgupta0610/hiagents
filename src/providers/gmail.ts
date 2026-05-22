@@ -272,7 +272,7 @@ export async function markRead(tenantId: string, messageId: string): Promise<voi
 // life of the mailbox; without this cache, every applyLabel call burns an
 // extra users.labels.list quota unit (2× the cost of the modify itself).
 // The cache only ever grows by labels we ourselves create, so it's tiny
-// (handful of `inbox-ai/*` labels per tenant).
+// (handful of `hiagents/*` labels per tenant).
 const labelIdCache = new Map<string, Map<string, string>>();
 
 function getLabelCache(tenantId: string): Map<string, string> {

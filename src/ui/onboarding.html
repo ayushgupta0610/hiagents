@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Set up · inbox-ai</title>
+<title>Set up · hiagents</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
@@ -77,7 +77,7 @@
 </head>
 <body>
 <div class="shell">
-  <div class="brand"><div class="brand-mark">ia</div><span style="font-weight:600">inbox-ai</span></div>
+  <div class="brand"><div class="brand-mark">ha</div><span style="font-weight:600">hiagents</span></div>
   <div class="progress">
     <div class="progress-step" data-step="welcome" title="Name your workspace">
       <div class="progress-bar"></div>
@@ -108,7 +108,7 @@
   <div class="err" id="err"></div>
 
   <section class="card step" id="step-welcome" style="display:none">
-    <h1>Welcome to inbox-ai</h1>
+    <h1>Welcome to hiagents</h1>
     <p class="sub">Tell us what to call this workspace. You can change it later.</p>
     <label for="name">Workspace name</label>
     <input id="name" placeholder="Acme Inc." maxlength="80">
@@ -217,7 +217,7 @@ function showConfirm({ title, message, confirmText = 'Confirm', cancelText = 'Ca
   });
 }
 function getCsrfTokenFromCookie() {
-  const m = document.cookie.match(/(?:^|;\s*)inbox_ai_csrf=([^;]+)/);
+  const m = document.cookie.match(/(?:^|;\s*)hiagents_csrf=([^;]+)/);
   return m ? decodeURIComponent(m[1]) : '';
 }
 async function api(path, opts) {

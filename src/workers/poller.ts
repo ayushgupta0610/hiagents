@@ -63,10 +63,10 @@ async function processTenant(tenant: Tenant, ownerEmail: string): Promise<void> 
       }
       const label =
         result.replyStatus === 'sent'
-          ? 'inbox-ai/replied'
+          ? 'hiagents/replied'
           : result.classification === 'skipped_thread'
-            ? 'inbox-ai/owner-took-over'
-            : 'inbox-ai/skipped';
+            ? 'hiagents/owner-took-over'
+            : 'hiagents/skipped';
       try {
         await applyLabel(tenant.id, id, label);
       } catch {
@@ -81,7 +81,7 @@ async function processTenant(tenant: Tenant, ownerEmail: string): Promise<void> 
         /* ignore */
       }
       try {
-        await applyLabel(tenant.id, id, 'inbox-ai/failed');
+        await applyLabel(tenant.id, id, 'hiagents/failed');
       } catch {
         /* ignore */
       }

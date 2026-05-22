@@ -1,4 +1,4 @@
-# inbox-ai · Feature inventory
+# hiagents · Feature inventory
 
 The canonical list of what the product offers end users. **Source of truth** for the pricing page, sales conversations, and the marketing site.
 
@@ -32,7 +32,7 @@ Last updated: 2026-05-22
 | A.4 | Retrieve relevant passages from your knowledge base via semantic search | ✅ Shipped | All tiers |
 | A.5 | Generate a reply grounded only in retrieved knowledge — no fabrication | ✅ Shipped | All tiers |
 | A.6 | Send reply in-thread via Gmail API, preserving Message-ID for cross-client threading (header values sanitized to block CRLF injection from attacker-controlled inbound mail) | ✅ Shipped | All tiers |
-| A.7 | Label processed emails in Gmail (inbox-ai/replied, inbox-ai/skipped, inbox-ai/failed) | ✅ Shipped | All tiers |
+| A.7 | Label processed emails in Gmail (hiagents/replied, hiagents/skipped, hiagents/failed) | ✅ Shipped | All tiers |
 | A.8 | Per-email audit log (decision, retrieved chunks, similarity score, reply text, status) | ✅ Shipped | All tiers |
 | A.9 | Auto-send vs draft mode toggle (per tenant) | ✅ Shipped | All tiers |
 | A.10 | First-N-replies-as-drafts "training wheels" mode | 🗺 Roadmap | All tiers |
@@ -138,7 +138,7 @@ Last updated: 2026-05-22
 | G.4 | Tenant isolation integration test (verifies no cross-tenant leakage) | ✅ Shipped | All tiers |
 | G.5 | Per-IP signin rate limit (5/hour) on `/oauth/signin` | ✅ Shipped | All tiers |
 | G.6 | OAuth refresh + access tokens encrypted at rest with AES-256-GCM (random IV per encrypt, GCM auth tag, `v1:` versioned format). Legacy plaintext rows opportunistically re-encrypted on next read. | ✅ Shipped | All tiers |
-| G.7 | CSRF protection: double-submit token pattern (HMAC-signed `inbox_ai_csrf` cookie + `X-CSRF-Token` header) enforced on every state-changing route | ✅ Shipped | All tiers |
+| G.7 | CSRF protection: double-submit token pattern (HMAC-signed `hiagents_csrf` cookie + `X-CSRF-Token` header) enforced on every state-changing route | ✅ Shipped | All tiers |
 | G.8 | Content Security Policy + X-Content-Type-Options + X-Frame-Options DENY + Referrer-Policy + Permissions-Policy on every response; HSTS in production | ✅ Shipped | All tiers |
 | G.9 | OAuth state nonce — every `/oauth/signin` and `/oauth/start` mints a 16-byte signed nonce in a 10-minute httpOnly cookie; `/oauth/callback` rejects on mismatch (defends against forged-callback phishing) | ✅ Shipped | All tiers |
 | G.10 | Output-side XSS escaping on user-controlled fields (workspace name) before innerHTML injection | ✅ Shipped | All tiers |

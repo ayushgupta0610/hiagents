@@ -69,5 +69,5 @@ export function isSystemSender(fromHeader: string): boolean {
 
 export const OUTGOING_LOOP_HEADERS: Record<string, string> = {
   'Auto-Submitted': 'auto-replied',
-  'X-Autoreply': 'inbox-ai',
+  'X-Autoreply': 'hiagents',
 };

@@ -23,7 +23,7 @@ export async function embed(texts: string[], tenantId?: string): Promise<number[
         'Content-Type': 'application/json',
         Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
         'HTTP-Referer': env.BASE_URL,
-        'X-Title': 'inbox-ai',
+        'X-Title': 'hiagents',
       },
       body: JSON.stringify({ model: MODEL, input: batch }),
     });

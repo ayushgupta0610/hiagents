@@ -1,4 +1,4 @@
-# Enterprise safety audit — inbox-ai email auto-reply
+# Enterprise safety audit — hiagents email auto-reply
 
 What is in place, what is missing, what to do about it. Categorised P0 / P1 / P2 by how badly an incident would hurt.
 
@@ -15,7 +15,7 @@ Last audit: 2026-05-21. Re-reviewed 2026-05-22 with most P0s + several P1s shipp
 | Skip inbound with `Precedence: bulk / list / junk` (newsletters) | ✅ in place | same |
 | Skip inbound with `List-Unsubscribe`, `List-Id` (mailing lists) | ✅ in place | same |
 | Set `Auto-Submitted: auto-replied` on outgoing replies | ✅ in place | `src/providers/gmail.ts` `OUTGOING_LOOP_HEADERS` |
-| Set `X-Autoreply: inbox-ai` on outgoing replies | ✅ in place | same |
+| Set `X-Autoreply: hiagents` on outgoing replies | ✅ in place | same |
 | Skip mail from self (owner mailbox) | ✅ in place | `src/pipeline/run.ts` `isFromSelf()` |
 | Skip thread if owner has manually replied | ✅ in place | `src/pipeline/thread-guard.ts` |
 | System-sender deny list for `mailer-daemon@`, `postmaster@`, `noreply@`, `no-reply@`, `bounces@`, `abuse@` | ✅ in place | `src/pipeline/loop-guard.ts` `isSystemSender()` |

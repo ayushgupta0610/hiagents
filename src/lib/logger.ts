@@ -7,5 +7,5 @@ export const logger = pino({
     env.NODE_ENV === 'production'
       ? undefined
       : { target: 'pino-pretty', options: { colorize: true } },
-  base: { service: 'inbox-ai' },
+  base: { service: 'hiagents' },
 });

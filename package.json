@@ -1,7 +1,7 @@
 {
-  "name": "inbox-ai",
+  "name": "hiagents",
   "version": "1.0.0",
-  "description": "",
+  "description": "hiagents — AI agents that ship real work. Inbox is the first: a Gmail-native auto-reply grounded in your knowledge base.",
   "main": "index.js",
   "directories": {
     "doc": "docs"
