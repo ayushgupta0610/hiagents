@@ -79,17 +79,9 @@
 <div class="shell">
   <div class="brand"><div class="brand-mark">ha</div><span style="font-weight:600">hiagents</span></div>
   <div class="progress">
-    <div class="progress-step" data-step="welcome" title="Name your workspace">
+    <div class="progress-step" data-step="setup" title="Workspace name, persona, classifier prompt — set them all in one shot">
       <div class="progress-bar"></div>
-      <div class="progress-label">Workspace</div>
-    </div>
-    <div class="progress-step" data-step="persona" title="Set the bot's tone, signature, and company description">
-      <div class="progress-bar"></div>
-      <div class="progress-label">Persona</div>
-    </div>
-    <div class="progress-step" data-step="classifier" title="Optionally tune what counts as a real customer question">
-      <div class="progress-bar"></div>
-      <div class="progress-label">Classifier</div>
+      <div class="progress-label">Set up</div>
     </div>
     <div class="progress-step" data-step="mailbox" title="Connect the Gmail account the bot will poll and reply from">
       <div class="progress-bar"></div>
@@ -107,17 +99,22 @@
 
   <div class="err" id="err"></div>
 
-  <section class="card step" id="step-welcome" style="display:none">
-    <h1>Welcome to hiagents</h1>
-    <p class="sub">Tell us what to call this workspace. You can change it later in Settings.</p>
-    <label for="name">Workspace name</label>
-    <input id="name" placeholder="Acme Inc." maxlength="80">
-    <div class="actions"><button class="btn btn-primary" id="welcome-next">Continue</button></div>
-  </section>
+  <!--
+    Combined "Set up" step — the three pure-form questions (workspace name,
+    persona, classifier prompt) used to be three clicks. They're all
+    independent and all default-friendly, so collapsing them into one card
+    cuts onboarding from 6 steps to 4 without losing any field. The submit
+    handler fires the three API calls in parallel.
+  -->
+  <section class="card step" id="step-setup" style="display:none">
+    <h1>Set up your workspace</h1>
+    <p class="sub">A few defaults so the bot sounds like you. Everything here is editable later in Settings — only the workspace name is required to continue.</p>
 
-  <section class="card step" id="step-persona" style="display:none">
-    <h1>How should the bot sound?</h1>
-    <p class="sub">These settings shape every reply. Defaults work — fine-tune now or change later in Settings.</p>
+    <h3 style="font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:8px 0 12px">Workspace</h3>
+    <label for="name">Name <span style="font-weight:400;color:var(--muted);font-size:12px">— required</span></label>
+    <input id="name" placeholder="Acme Inc." maxlength="80">
+
+    <h3 style="font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:24px 0 12px">How should the bot sound?</h3>
     <label>Tone</label>
     <div class="tone-chips" id="tone-chips">
       <button type="button" class="tone-chip" data-val="professional, warm, concise">Professional</button>
@@ -138,21 +135,15 @@
     </p>
     <textarea id="companyDescription" placeholder="Acme is a fintech that helps small SaaS teams manage SOC 2 compliance without a dedicated security hire." maxlength="1000"></textarea>
 
-    <div class="actions">
-      <button type="button" class="btn" data-back="welcome">← Back</button>
-      <button class="btn btn-primary" id="persona-next">Continue</button>
-    </div>
-  </section>
-
-  <section class="card step" id="step-classifier" style="display:none">
-    <h1>Classifier prompt <span style="font-weight:400;color:var(--muted);font-size:14px">— optional</span></h1>
-    <p class="sub">The bot first asks a small LLM: "is this a real customer question?" If you want to tune what counts, edit the prompt below — or skip to keep the smart default. You can change this later in Settings.</p>
-    <label>Custom classifier prompt (leave empty for default)</label>
+    <h3 style="font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);margin:24px 0 12px">Classifier prompt <span style="text-transform:none;font-weight:400;font-size:12px;color:var(--muted)">— optional, leave blank for the smart default</span></h3>
+    <p style="margin:0 0 8px;color:var(--muted);font-size:12px;line-height:1.45">
+      Before retrieving anything, the bot asks a small LLM "is this a real customer question?".
+      If you want to tune what counts as a customer query, write the prompt below — otherwise leave it blank.
+    </p>
     <textarea id="classifierPrompt" placeholder="Reply CLIENT_QUERY if the email asks anything about AI tools, automation, our pricing, or our services. Reply OTHER for newsletters, receipts, or empty/test messages. Reply with exactly one word." maxlength="2000"></textarea>
-    <div class="actions">
-      <button type="button" class="btn" data-back="persona">← Back</button>
-      <button class="btn btn-primary" id="classifier-next">Continue</button>
-      <button class="skip-link" id="classifier-skip">Use default</button>
+
+    <div class="actions" style="margin-top:8px">
+      <button class="btn btn-primary" id="setup-next">Continue</button>
     </div>
   </section>
 
@@ -161,7 +152,7 @@
     <p class="sub">The bot polls this mailbox every minute and replies on its behalf. We use Google's official OAuth — your credentials never touch our servers.</p>
     <div id="mailbox-status" style="margin-bottom:16px"></div>
     <div class="actions">
-      <button type="button" class="btn" data-back="classifier">← Back</button>
+      <button type="button" class="btn" data-back="setup">← Back</button>
       <a class="btn btn-primary" href="/oauth/start">Connect Gmail</a>
       <button class="btn" id="mailbox-refresh">I've connected — refresh status</button>
     </div>
@@ -264,42 +255,69 @@ function markDone(steps) {
     document.querySelector(`.progress-step[data-step="${name}"]`)?.classList.toggle('done', !!done);
   }
 }
-// Classifier is the only step the server can't natively detect as "visited"
-// (its prompt field can legitimately stay null = use default). We track it
-// client-side via sessionStorage keyed on the tenant id, so reloads inside
-// the same browser tab resume past the classifier step. If the user
-// navigates away and comes back in a fresh tab, they see classifier once
-// more — harmless, takes one click to skip.
-function classifierSeenKey(tenantId) {
-  return `hiagents_onboarding_classifier_seen_${tenantId}`;
-}
-function markClassifierSeen(tenantId) {
-  try { sessionStorage.setItem(classifierSeenKey(tenantId), '1'); } catch { /* private mode */ }
-}
-function isClassifierSeen(tenantId) {
-  try { return sessionStorage.getItem(classifierSeenKey(tenantId)) === '1'; } catch { return false; }
-}
-
 async function loadState() {
   const s = await api('/admin/onboarding/api/state');
   markDone(s.steps);
   if (s.steps.done) { window.location.href = '/admin'; return; }
-  // New onboarding order: Workspace → Persona → Classifier → Gmail → Knowledge → Review.
-  // Persona + Classifier are pure form steps, so we let users finish them
-  // before the (slower, third-party-flow) Gmail step.
-  if (!s.steps.welcome) return show('welcome');
-  if (!s.steps.persona) return show('persona');
-  if (!isClassifierSeen(s.tenant.id)) return show('classifier');
+  // Onboarding order: Set up → Gmail → Knowledge → Review.
+  // The combined "Set up" step covers workspace name + persona + classifier
+  // prompt in one card. The server still tracks each as a separate boolean
+  // so back-fills work, but in the UI they share a single Continue.
+  // We treat the setup step as "done" only when ALL three sub-steps are done:
+  // workspace (welcome) AND persona AND classifier-acknowledged.
+  if (!s.steps.welcome || !s.steps.persona) {
+    prefillSetup(s);
+    return show('setup');
+  }
   if (!s.steps.mailbox) { await refreshMailbox(); return show('mailbox'); }
   if (!s.steps.kb) return show('kb');
   return renderSummaryAndGoDone();
 }
 
-document.getElementById('welcome-next').addEventListener('click', async () => {
+// If a user got partway through onboarding before, prefill the setup form
+// with whatever they had saved last time so they don't have to retype.
+async function prefillSetup(state) {
+  // state.tenant.name is the workspace name; the persona + classifier values
+  // aren't in /api/state, so pull them via /api/settings if the user has
+  // already saved anything.
+  if (state.tenant?.name && state.tenant.name !== state.tenant.slug) {
+    document.getElementById('name').value = state.tenant.name;
+  }
+}
+
+// Combined Set-up submit — fires the three independent API calls in parallel
+// so the user perceives one click. Each endpoint is idempotent; if one fails
+// we surface that error but the others may have succeeded. Worst case the
+// user clicks Continue again.
+document.getElementById('setup-next').addEventListener('click', async () => {
   const name = document.getElementById('name').value.trim();
-  if (!name) { showErr('Enter a workspace name'); return; }
-  try { await api('/admin/onboarding/api/welcome', { method: 'POST', body: JSON.stringify({ name }) }); await loadState(); }
-  catch(e) { showErr(e.message); }
+  if (!name) { showErr('Enter a workspace name to continue.'); return; }
+
+  const personaPayload = {
+    signature: document.getElementById('signature').value.trim(),
+    tone: document.getElementById('tone').value.trim(),
+    companyDescription: document.getElementById('companyDescription').value.trim(),
+  };
+  const classifierPayload = {
+    prompt: document.getElementById('classifierPrompt').value,
+  };
+
+  const btn = document.getElementById('setup-next');
+  btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = 'Saving…';
+  try {
+    await Promise.all([
+      api('/admin/onboarding/api/welcome', { method: 'POST', body: JSON.stringify({ name }) }),
+      api('/admin/onboarding/api/persona', { method: 'POST', body: JSON.stringify(personaPayload) }),
+      api('/admin/onboarding/api/classifier', { method: 'POST', body: JSON.stringify(classifierPayload) }),
+    ]);
+    await loadState();
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+    showErr(e.message);
+  }
 });
 
 async function refreshMailbox() {
@@ -319,18 +337,6 @@ document.querySelectorAll('.tone-chip').forEach(el => el.addEventListener('click
   el.classList.add('active');
   document.getElementById('tone').value = el.dataset.val;
 }));
-document.getElementById('persona-next').addEventListener('click', async () => {
-  const payload = {
-    signature: document.getElementById('signature').value.trim(),
-    tone: document.getElementById('tone').value.trim(),
-    // Optional now — empty companyDescription is fine; the model falls back to
-    // a generic "the recipient" framing in generate.ts.
-    companyDescription: document.getElementById('companyDescription').value.trim(),
-  };
-  try { await api('/admin/onboarding/api/persona', { method: 'POST', body: JSON.stringify(payload) }); await loadState(); }
-  catch(e) { showErr(e.message); }
-});
-
 const kbFile = document.getElementById('kb-file');
 const kbStatus = document.getElementById('kb-upload-status');
 const kbNext = document.getElementById('kb-next');

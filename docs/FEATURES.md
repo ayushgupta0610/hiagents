@@ -32,7 +32,7 @@ Last updated: 2026-05-22
 | A.4 | Retrieve relevant passages from your knowledge base via semantic search | ✅ Shipped | All tiers |
 | A.5 | Generate a reply grounded only in retrieved knowledge — no fabrication | ✅ Shipped | All tiers |
 | A.6 | Send reply in-thread via Gmail API, preserving Message-ID for cross-client threading (header values sanitized to block CRLF injection from attacker-controlled inbound mail) | ✅ Shipped | All tiers |
-| A.7 | Label processed emails in Gmail (hiagents/replied, hiagents/skipped, hiagents/failed) | ✅ Shipped | All tiers |
+| A.7 | Label processed emails in Gmail (hiagents/replied, hiagents/skipped, hiagents/failed) | 🚫 Removed 2026-05-22 — same status info is on each `messages` row + visible in the Activity dashboard; writing labels into the user's mailbox was visual clutter for very little marginal value | — |
 | A.8 | Per-email audit log (decision, retrieved chunks, similarity score, reply text, status) | ✅ Shipped | All tiers |
 | A.9 | Auto-send vs draft mode toggle (per tenant) | ✅ Shipped | All tiers |
 | A.10 | First-N-replies-as-drafts "training wheels" mode | 🗺 Roadmap | All tiers |
@@ -118,7 +118,7 @@ Last updated: 2026-05-22
 |---|---|---|---|
 | F.1 | Auto-provisioned workspace on first Google sign-in | ✅ Shipped | All tiers |
 | F.2 | One owner per workspace (the email that signed up) | ✅ Shipped | All tiers |
-| F.3 | Six-step onboarding wizard (Workspace / Gmail / Persona / Knowledge / Classifier / Review) | ✅ Shipped | All tiers |
+| F.3 | Four-step onboarding wizard (Set up workspace / Gmail / Knowledge / Review) — workspace name, persona, and classifier prompt combined into one Set-up card | ✅ Shipped | All tiers |
 | F.4 | "Start over with a different account" during onboarding | ✅ Shipped | All tiers |
 | F.5 | Soft-delete workspace (30-day grace before hard delete) | ✅ Shipped | All tiers |
 | F.6 | Invite teammates as additional admins / viewers | 🗺 Roadmap | Pro+ |

@@ -8,7 +8,6 @@ import {
   saveTokensForTenant,
   buildMailboxAuthUrl,
   buildSigninAuthUrl,
-  clearLabelCacheForTenant,
 } from '../providers/gmail.js';
 import { requireAdmin, issueSessionForEmail } from '../lib/auth.js';
 import { findTenantForEmail, provisionTenant } from '../tenant/store.js';
@@ -214,10 +213,6 @@ oauthRouter.get('/callback', async (req, res) => {
         },
         email,
       );
-      // If the user reconnected with a different Gmail, the cached label
-      // ids from the previous mailbox are now stale — drop them so the
-      // next applyLabel re-resolves against the new mailbox.
-      clearLabelCacheForTenant(stateTenantId);
       auditFireAndForget(stateTenantId, email, 'gmail.connected', { ip: req.ip });
       logger.info({ email, tenantId: stateTenantId }, 'gmail mailbox connected');
 

@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { logger } from '../lib/logger.js';
 import { env } from '../config.js';
-import { listUnreadInbox, fetchMessage, markRead, applyLabel } from '../providers/gmail.js';
+import { listUnreadInbox, fetchMessage, markRead } from '../providers/gmail.js';
 import { runPipeline } from '../pipeline/run.js';
 import { listOnboardedTenants, type Tenant } from '../tenant/store.js';
 import { db } from '../db/client.js';
@@ -55,33 +55,22 @@ async function processTenant(tenant: Tenant, ownerEmail: string): Promise<void> 
   for (const id of ids) {
     try {
       const email = await fetchMessage(tenant.id, id);
-      const result = await runPipeline({ tenant, ownerEmail }, email);
+      await runPipeline({ tenant, ownerEmail }, email);
       try {
         await markRead(tenant.id, id);
       } catch {
         /* ignore */
       }
-      const label =
-        result.replyStatus === 'sent'
-          ? 'hiagents/replied'
-          : result.classification === 'skipped_thread'
-            ? 'hiagents/owner-took-over'
-            : 'hiagents/skipped';
-      try {
-        await applyLabel(tenant.id, id, label);
-      } catch {
-        /* ignore */
-      }
+      // Intentionally NOT applying Gmail labels — same status info is
+      // already recorded on the corresponding `messages` row (classification
+      // + reply_status) and surfaced in the Activity dashboard. Writing
+      // labels into the user's actual mailbox was visual clutter for them
+      // for very little marginal value.
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       logger.error({ tenantId: tenant.id, id, err: msg }, 'pipeline failed for message');
       try {
         await markRead(tenant.id, id);
-      } catch {
-        /* ignore */
-      }
-      try {
-        await applyLabel(tenant.id, id, 'hiagents/failed');
       } catch {
         /* ignore */
       }
