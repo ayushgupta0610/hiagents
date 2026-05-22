@@ -4,6 +4,7 @@ import { db } from '../db/client.js';
 import { env } from '../config.js';
 import { OUTGOING_LOOP_HEADERS } from '../pipeline/loop-guard.js';
 import { logger } from '../lib/logger.js';
+import { encryptToken, decryptToken } from '../lib/crypto.js';
 import type { IncomingEmail } from '../types.js';
 import type { ThreadMessage } from '../pipeline/thread-guard.js';
 
@@ -62,22 +63,26 @@ export async function loadStoredTokensForTenant(tenantId: string): Promise<OAuth
   if (error) throw new Error(`Failed to load oauth tokens: ${error.message}`);
   if (!data) return null;
   const oauth = getOAuthClient();
+  // Tokens are encrypted at rest with AES-256-GCM. decryptToken is backward
+  // compatible with rows written before encryption shipped (returns as-is
+  // when the v1: prefix is absent) so existing tenants keep working until
+  // their next token rotation re-saves them encrypted.
   oauth.setCredentials({
-    access_token: data.access_token,
-    refresh_token: data.refresh_token,
+    access_token: decryptToken(data.access_token),
+    refresh_token: decryptToken(data.refresh_token),
     expiry_date: new Date(data.expires_at).getTime(),
     scope: data.scope,
   });
   oauth.on('tokens', async (tokens) => {
     if (tokens.access_token) {
       const patch: Record<string, unknown> = {
-        access_token: tokens.access_token,
+        access_token: encryptToken(tokens.access_token),
         expires_at: tokens.expiry_date
           ? new Date(tokens.expiry_date).toISOString()
           : new Date(Date.now() + 3500_000).toISOString(),
         updated_at: new Date().toISOString(),
       };
-      if (tokens.refresh_token) patch.refresh_token = tokens.refresh_token;
+      if (tokens.refresh_token) patch.refresh_token = encryptToken(tokens.refresh_token);
       try {
         await db().from('oauth_tokens').update(patch).eq('tenant_id', tenantId);
         logger.debug({ tenantId }, 'refreshed gmail access token');
@@ -107,8 +112,8 @@ export async function saveTokensForTenant(
     .upsert(
       {
         tenant_id: tenantId,
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
+        access_token: encryptToken(tokens.access_token),
+        refresh_token: encryptToken(tokens.refresh_token),
         expires_at: new Date(tokens.expiry_date).toISOString(),
         scope: tokens.scope,
         email,
