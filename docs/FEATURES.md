@@ -18,7 +18,7 @@ Each feature also lists its tier eligibility:
 
 Update this file whenever a feature ships or its status changes. Then update the pricing page from this file (don't hand-edit the pricing page).
 
-Last updated: 2026-05-22
+Last updated: 2026-05-22 (second revision)
 
 ---
 
@@ -33,6 +33,7 @@ Last updated: 2026-05-22
 | A.5 | Generate a reply grounded only in retrieved knowledge — no fabrication | ✅ Shipped | All tiers |
 | A.6 | Send reply in-thread via Gmail API, preserving Message-ID for cross-client threading (header values sanitized to block CRLF injection from attacker-controlled inbound mail) | ✅ Shipped | All tiers |
 | A.7 | Label processed emails in Gmail (hiagents/replied, hiagents/skipped, hiagents/failed) | 🚫 Removed 2026-05-22 — same status info is on each `messages` row + visible in the Activity dashboard; writing labels into the user's mailbox was visual clutter for very little marginal value | — |
+| A.7a | Mark processed emails as read in Gmail | 🚫 Removed 2026-05-22 — silently changing the user's unread count was worse than the labels (the unread count is the primary signal users use to manage their inbox). Dedupe is handled by the `messages.gmail_message_id` idempotency check in `runPipeline` instead | — |
 | A.8 | Per-email audit log (decision, retrieved chunks, similarity score, reply text, status) | ✅ Shipped | All tiers |
 | A.9 | Auto-send vs draft mode toggle (per tenant) | ✅ Shipped | All tiers |
 | A.10 | First-N-replies-as-drafts "training wheels" mode | 🗺 Roadmap | All tiers |
@@ -64,7 +65,7 @@ Last updated: 2026-05-22
 |---|---|---|---|
 | C.1 | Tone selector (Professional / Friendly / Formal / Playful + custom) | ✅ Shipped | All tiers |
 | C.2 | Signature configurable per tenant | ✅ Shipped | All tiers |
-| C.3 | Company / context description (grounds replies in your business) | ✅ Shipped | All tiers |
+| C.3 | Company / context description — interpolated into the reply system prompt as "you are replying on behalf of …" so the bot knows who it represents. Optional; empty falls back to generic framing | ✅ Shipped | All tiers |
 | C.4 | Custom classifier prompt (decide what counts as a customer query) | ✅ Shipped | Pro+ |
 | C.5 | Per-tenant choice of reply model | 🚫 Removed 2026-05-22 — model is deployment-wide, edit `defaultTenantSettings()` to change | — |
 | C.6 | Per-tenant choice of classifier model | 🚫 Removed 2026-05-22 — same reason as C.5 | — |
@@ -103,7 +104,7 @@ Last updated: 2026-05-22
 | E.3 | Filter activity by All / Sent / Skipped / Failed | ✅ Shipped | All tiers |
 | E.4 | Per-message audit detail: retrieved chunk IDs, top similarity score, reply timestamp | ✅ Shipped | All tiers |
 | E.5 | KPI dashboard: documents, replies sent 7d, skipped 7d, last email timestamp | ✅ Shipped | All tiers |
-| E.6 | Per-model LLM usage rollup (tokens + USD cost, last 30 days) | ✅ Shipped | All tiers |
+| E.6 | AI usage summary in Settings — total USD cost over the last 30 days (the previous per-model token table was simplified to a single big-number total; per-model breakdown is still queryable in `llm_usage` for operators) | ✅ Shipped | All tiers |
 | E.7 | Audit log for all admin actions (settings changes, KB ops, OAuth events) | ✅ Shipped | All tiers |
 | E.8 | Real-time activity stream (WebSocket / SSE) | 🗺 Roadmap | Pro+ |
 | E.9 | Email-summary digest ("yesterday: 47 replies sent, 3 flagged") | 🗺 Roadmap | All tiers |
@@ -162,9 +163,9 @@ Last updated: 2026-05-22
 
 | # | Feature | Status | Tier |
 |---|---|---|---|
-| H.1 | Per-tenant settings UI: persona, retrieval (threshold + top-K), classifier prompt, auto-send, pause toggle, danger-zone delete | ✅ Shipped | All tiers |
+| H.1 | Per-tenant settings UI: persona, classifier prompt, auto-send, pause toggle, danger-zone delete | ✅ Shipped | All tiers |
 | H.2 | Operator-controlled reply + classifier model (no tenant dropdown; edit `defaultTenantSettings()` to change) | ✅ Shipped | All tiers |
-| H.3 | Configurable similarity threshold + top-K | ✅ Shipped | All tiers |
+| H.3 | Configurable similarity threshold + top-K | 🚫 Removed 2026-05-22 from per-tenant UI — these are operator-tuning knobs, not user-facing decisions. Defaults work for everyone; an operator can still edit `defaultTenantSettings()` or hit the settings PUT endpoint directly (the Zod schema still accepts them) | — |
 | H.4 | Per-tenant rate-limit knobs (daily email cap, per-sender cap, spend cap) | ✅ Shipped | All tiers |
 | H.5 | Bring-your-own OpenRouter key (per-tenant cost attribution) | 🗺 Roadmap | Pro+ |
 | H.6 | Bring-your-own OpenAI / Anthropic / Google key | 🗺 Roadmap | Pro+ |

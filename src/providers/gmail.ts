@@ -259,15 +259,6 @@ export async function fetchThreadMessages(
     }));
 }
 
-export async function markRead(tenantId: string, messageId: string): Promise<void> {
-  const gmail = await getGmailClientForTenant(tenantId);
-  await gmail.users.messages.modify({
-    userId: 'me',
-    id: messageId,
-    requestBody: { removeLabelIds: ['UNREAD'] },
-  });
-}
-
 export interface SendReplyInput {
   threadId: string;
   inReplyToMessageId: string;

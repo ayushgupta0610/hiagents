@@ -71,11 +71,15 @@ Last audit: 2026-05-21. Re-reviewed 2026-05-22 with most P0s + several P1s shipp
 | Confidence gate prevents reply when no chunks above threshold | ✅ in place | `src/pipeline/run.ts` |
 | Outbound moderation (toxicity, legal commitments, PII leakage, leaked-system-prompt detection) | ✅ in place | `src/pipeline/moderate.ts` (`moderateOutbound`); flagged replies log `reply_status='failed', reply_reason='content-flagged'` and are NOT sent |
 | Header injection sanitization on `To` / `Subject` / `In-Reply-To` (strips CRLF / NUL, validates Message-ID shape) | ✅ in place | `src/providers/gmail.ts` `sanitizeHeader` + `sanitizeMessageId` |
+| Moderation prompt is built per-call with `tenant.settings.persona.companyDescription` interpolated near the top — so the moderator can tell legitimate technical content (a devtools company answering a CLI question) apart from a leaked-prompt or RCE attempt | ✅ in place | `src/pipeline/moderate.ts` `buildSystemPrompt()` |
+| Dangerous-shell-command rule is specific (remote-exec pipes, destructive commands, credential exfiltration) rather than a blanket ban on "code or shell commands" | ✅ in place | same |
 | **MISSING:** unsubscribe footer on outbound (CAN-SPAM compliance for any marketing-adjacent reply) | ❌ P1 | — |
 | **MISSING:** brand-voice consistency check (does the reply sound on-brand?) | ❌ P2 | — |
 | **MISSING:** hallucination scorer (does the reply contain claims not present in retrieved chunks?) | ❌ P2 | — |
 
 **Risk-now (post-fix):** the moderation step uses the same LLM family as generation, so it can miss the same blind spots. PII leakage is detected when the reply text contains identifiable patterns (emails, phone numbers, IDs); but a moderation pass cannot stop a reply that subtly leaks something contextual. For high-stakes tenants (legal / medical / financial), `autoSend=false` (draft mode) is the right configuration until quality is proven.
+
+**Calibration history:** an earlier blanket rule "no code or shell commands" caused false-positives for devtools tenants whose customers were legitimately asking about CLI usage. The fix (2026-05-22) was twofold: (a) feed the moderator the tenant's company description so it has business context, and (b) carve out an explicit "technical content is fine if it answers the customer's question and matches the business" allowance, with the dangerous-pattern rule scoped down to actual remote-exec / destructive / credential-exfiltration shapes. Two integration tests now lock both directions in: `OK — devtools company answering a legitimate CLI question` and `FLAGGED — dangerous shell command (curl pipe to bash)`. Don't reintroduce the blanket rule.
 
 ---
 
