@@ -1169,13 +1169,51 @@ async function deleteDoc(id) {
   }
 }
 
+// Activity feed pagination state.
+// - msgsHasMore: whether the server says older pages exist
+// - msgsNextBefore: ISO timestamp to send as `?before=` for the next page
+// - msgsLoadingOlder: guards against double-clicks on the Load older button
+let msgsHasMore = false;
+let msgsNextBefore = null;
+let msgsLoadingOlder = false;
+
 async function loadMsgs() {
+  // Initial / refresh load — replaces cachedMsgs with the latest page.
+  // 30s setInterval calls this; we always want the freshest top of the
+  // list, so resetting is correct (the user can re-paginate after if they
+  // were deep in older pages).
   const tbody = $('#msgs tbody');
   try {
-    cachedMsgs = await safeFetch('/admin/api/messages');
+    const resp = await safeFetch('/admin/api/messages?paginate=1');
+    // Defensive: support both envelope and bare-array responses in case
+    // the server / client ever drift on the paginate flag.
+    const items = Array.isArray(resp) ? resp : (resp?.items ?? []);
+    cachedMsgs = items;
+    msgsHasMore = Array.isArray(resp) ? false : !!resp?.hasMore;
+    msgsNextBefore = Array.isArray(resp) ? null : (resp?.nextBefore ?? null);
     renderMsgs();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="5"><div class="card-empty"><span class="pill pill-failed">Error</span> ${escapeHtml(err.message)}</div></td></tr>`;
+  }
+}
+
+async function loadOlderMsgs() {
+  if (!msgsHasMore || msgsLoadingOlder || !msgsNextBefore) return;
+  msgsLoadingOlder = true;
+  renderMsgs(); // re-render so the button shows "Loading…"
+  try {
+    const resp = await safeFetch(
+      '/admin/api/messages?paginate=1&before=' + encodeURIComponent(msgsNextBefore),
+    );
+    const items = Array.isArray(resp) ? resp : (resp?.items ?? []);
+    cachedMsgs = cachedMsgs.concat(items);
+    msgsHasMore = Array.isArray(resp) ? false : !!resp?.hasMore;
+    msgsNextBefore = Array.isArray(resp) ? null : (resp?.nextBefore ?? null);
+  } catch (err) {
+    showError('Could not load older messages: ' + err.message);
+  } finally {
+    msgsLoadingOlder = false;
+    renderMsgs();
   }
 }
 
@@ -1190,7 +1228,12 @@ function filterMsg(m) {
 function renderMsgs() {
   const tbody = $('#msgs tbody');
   const filtered = cachedMsgs.filter(filterMsg);
-  $('#nav-count-activity').textContent = cachedMsgs.length;
+  // Sidebar count: show "100+" while more pages exist server-side, plain
+  // count once the user has paged through everything. Avoids the
+  // confusing-forever "100" we had before.
+  $('#nav-count-activity').textContent = msgsHasMore
+    ? `${cachedMsgs.length}+`
+    : String(cachedMsgs.length);
 
   if (filtered.length === 0) {
     if (cachedMsgs.length === 0) {
@@ -1255,6 +1298,36 @@ function renderMsgs() {
         row.classList.add('expanded');
       }
     });
+  }
+
+  // Footer row: "Load older" button if there's more, "End of activity"
+  // marker once the user has paged through everything. Skipped while a
+  // filter is hiding rows because the visible/filtered count would lie
+  // about whether anything older actually exists.
+  if (msgsHasMore || cachedMsgs.length >= 100) {
+    const footer = document.createElement('tr');
+    footer.className = 'activity-footer';
+    if (msgsHasMore) {
+      footer.innerHTML = `
+        <td colspan="5" style="text-align: center; padding: 16px;">
+          <button class="btn" id="load-older-msgs" ${msgsLoadingOlder ? 'disabled' : ''}>
+            ${msgsLoadingOlder ? 'Loading…' : 'Load older messages'}
+          </button>
+          <div style="margin-top: 8px; font-size: 12px; color: var(--text-muted)">
+            Showing ${cachedMsgs.length} most recent · older pages available
+          </div>
+        </td>
+      `;
+    } else {
+      footer.innerHTML = `
+        <td colspan="5" style="text-align: center; padding: 16px; font-size: 12px; color: var(--text-muted)">
+          Showing all ${cachedMsgs.length} messages · this is everything we have
+        </td>
+      `;
+    }
+    tbody.appendChild(footer);
+    const btn = footer.querySelector('#load-older-msgs');
+    if (btn) btn.addEventListener('click', loadOlderMsgs);
   }
 }
 

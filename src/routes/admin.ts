@@ -149,7 +149,23 @@ adminRouter.delete('/api/documents/:id', requireAdmin, csrfGuard, async (req, re
   }
 });
 
-adminRouter.get('/api/messages', requireAdmin, async (_req, res) => {
+// Activity feed — cursor-paginated by received_at (descending). The UI
+// loads the latest PAGE_SIZE on first render, then calls again with
+// ?before=<oldest-loaded-received_at-iso> to fetch the next page.
+//
+// Response shape: { items: Message[], hasMore: boolean, nextBefore: iso|null }
+//
+// We fetch PAGE_SIZE+1 rows and trim the extra; hasMore is true if that
+// extra row existed, so the UI can decide whether to render a "Load older"
+// button. nextBefore is the received_at of the last *returned* row, ready
+// to be sent back as the next ?before value.
+//
+// Backward compat: callers that just GET /api/messages (no params, no
+// envelope expectation) get back the items array directly when the
+// `?paginate=1` query param is absent. The admin UI sends paginate=1.
+const ACTIVITY_PAGE_SIZE = 100;
+
+adminRouter.get('/api/messages', requireAdmin, async (req, res) => {
   const tenantId = res.locals.tenantId as string | null;
   if (!tenantId) {
     sendError(res, 400, {
@@ -158,12 +174,24 @@ adminRouter.get('/api/messages', requireAdmin, async (_req, res) => {
     });
     return;
   }
-  const { data, error } = await db()
+
+  const before = typeof req.query.before === 'string' ? req.query.before : null;
+  const paginate = req.query.paginate === '1';
+
+  let query = db()
     .from('messages')
     .select('*')
     .eq('tenant_id', tenantId)
     .order('received_at', { ascending: false })
-    .limit(100);
+    .limit(ACTIVITY_PAGE_SIZE + 1);
+
+  // Defensive parse so a malformed ?before doesn't blow up the query —
+  // Supabase would reject it with a 500. Treat as "no cursor".
+  if (before && !Number.isNaN(Date.parse(before))) {
+    query = query.lt('received_at', before);
+  }
+
+  const { data, error } = await query;
   if (error) {
     sendError(res, 500, {
       code: 'internal-error',
@@ -172,7 +200,17 @@ adminRouter.get('/api/messages', requireAdmin, async (_req, res) => {
     });
     return;
   }
-  res.json(data);
+
+  const rows = (data ?? []) as Array<{ received_at: string }>;
+  const hasMore = rows.length > ACTIVITY_PAGE_SIZE;
+  const items = hasMore ? rows.slice(0, ACTIVITY_PAGE_SIZE) : rows;
+  const nextBefore = hasMore ? items[items.length - 1]?.received_at ?? null : null;
+
+  if (paginate) {
+    res.json({ items, hasMore, nextBefore });
+  } else {
+    res.json(items);
+  }
 });
 
 adminRouter.get('/api/status', requireAdmin, async (req, res) => {
