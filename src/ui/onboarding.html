@@ -240,10 +240,16 @@ async function api(path, opts) {
   }
   try { return await r.json(); } catch { return null; }
 }
-function showErr(msg) {
+// `sticky` errors don't auto-hide. Use for page-load / state-resolution
+// failures, where the user needs to keep seeing the message to know what
+// to do (otherwise they're left staring at a blank shell, which is the
+// exact bug being fixed here). Transient errors from user actions still
+// auto-hide after 5s.
+function showErr(msg, opts = {}) {
   const el = document.getElementById('err');
-  el.textContent = msg; el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 5000);
+  el.textContent = msg;
+  el.classList.add('show');
+  if (!opts.sticky) setTimeout(() => el.classList.remove('show'), 5000);
 }
 function show(stepId) {
   document.querySelectorAll('.step').forEach(el => el.style.display = el.id === `step-${stepId}` ? 'block' : 'none');
@@ -440,7 +446,21 @@ document.getElementById('start-over').addEventListener('click', async (ev) => {
   }
 });
 
-loadState().catch(e => showErr(e.message));
+// On initial load: try to resolve the right step from server state. If
+// anything fails (network blip, /api/state error, tenant lookup race
+// after first sign-in, etc.) — fail OPEN to the Setup card so the user
+// has something to do, and pin a sticky diagnostic so they understand
+// what happened and can include the error code if they reach out.
+loadState().catch((e) => {
+  const codeSuffix = e.code ? ` [${e.code}]` : '';
+  showErr(
+    `We couldn't load your onboarding state: ${e.message}${codeSuffix}. ` +
+      `You can still fill in the form below — we'll save what you enter and re-check from there.`,
+    { sticky: true },
+  );
+  // Render the first step so the page isn't a dead shell.
+  show('setup');
+});
 if (location.hash === '#mailbox-return') refreshMailbox();
 </script>
 </body>
