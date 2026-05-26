@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Set up · hiagents</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23e9b872'/%3E%3Cpath d='M8 11 L16 18 L24 11' stroke='%2307070a' stroke-width='2.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
@@ -248,8 +249,20 @@ function show(stepId) {
   document.querySelector(`.progress-step[data-step="${stepId}"]`)?.classList.add('current');
 }
 function markDone(steps) {
-  for (const [name, done] of Object.entries(steps)) {
-    document.querySelector(`.progress-step[data-step="${name}"]`)?.classList.toggle('done', !!done);
+  // The progress bar uses coarse names (setup / kb / done) but the server's
+  // `steps` object exposes finer-grained booleans (welcome / persona /
+  // mailbox / kb / classifier / done) — one per underlying state row. Roll
+  // them up to progress-bar terms so the "Set up" pill actually turns green
+  // when the user finishes that step. Without this rollup the loop tries
+  // to set `done` on `.progress-step[data-step="welcome"]` etc, which don't
+  // exist in the DOM, and Set up stays grey forever.
+  const rollup = {
+    setup: !!steps.welcome && !!steps.persona,
+    kb: !!steps.kb,
+    done: !!steps.done,
+  };
+  for (const [name, done] of Object.entries(rollup)) {
+    document.querySelector(`.progress-step[data-step="${name}"]`)?.classList.toggle('done', done);
   }
 }
 async function loadState() {

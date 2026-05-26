@@ -62,8 +62,13 @@ test.describe("App public surfaces (bot.aiagencycorp.com)", () => {
     expect(headers["x-content-type-options"]).toBe("nosniff");
     expect(headers["x-frame-options"]).toBe("DENY");
     expect(headers["referrer-policy"]).toBeTruthy();
-    // HSTS only in production NODE_ENV — assume prod for this VPS
-    expect(headers["strict-transport-security"], "HSTS in prod").toBeTruthy();
+    // HSTS is only emitted when NODE_ENV=production. The test passes both
+    // against the prod VPS (HSTS present) and a local dev build (HSTS
+    // absent). Server.ts gates it on env.NODE_ENV === 'production'.
+    const isProdHost = /^https:\/\//.test(APP_URL);
+    if (isProdHost) {
+      expect(headers["strict-transport-security"], "HSTS on prod").toBeTruthy();
+    }
   });
 
   test("POST /admin/api/* without CSRF rejected (403)", async ({ request }) => {
