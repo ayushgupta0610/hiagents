@@ -387,22 +387,10 @@ kbFile.addEventListener('change', async () => {
 });
 kbNext.addEventListener('click', () => loadState());
 
-async function saveClassifierAndAdvance(prompt) {
-  try {
-    await api('/admin/onboarding/api/classifier', { method: 'POST', body: JSON.stringify({ prompt }) });
-    // Mark classifier seen so we don't loop back here on next loadState().
-    // tenant id comes from the most recent state fetch — re-fetch to be safe.
-    const s = await api('/admin/onboarding/api/state');
-    markClassifierSeen(s.tenant.id);
-    await loadState();
-  } catch (e) { showErr(e.message); }
-}
-document.getElementById('classifier-next').addEventListener('click', () => {
-  saveClassifierAndAdvance(document.getElementById('classifierPrompt').value);
-});
-document.getElementById('classifier-skip').addEventListener('click', () => {
-  saveClassifierAndAdvance('');
-});
+// saveClassifierAndAdvance + #classifier-next + #classifier-skip listeners
+// removed alongside the dedicated Classifier card when we merged Workspace +
+// Persona + Classifier into the single Set up card. The classifier prompt is
+// now submitted as part of the Set-up Continue button (see #setup-next).
 
 async function renderSummaryAndGoDone() {
   const s = await api('/admin/onboarding/api/state');
