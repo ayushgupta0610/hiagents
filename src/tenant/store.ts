@@ -56,13 +56,33 @@ function slugify(s: string): string {
 }
 
 // In-process cache for findTenantForEmail. Every authenticated request
-// goes through requireAdmin → findTenantForEmail (a JOIN on memberships
-// + tenants), so caching here cuts ~80% of those round-trips during active
+// goes through requireAdmin → findTenantForEmail (a JOIN on memberships +
+// tenants), so caching here cuts ~80% of those round-trips during active
 // admin use. TTL is short (30s) so role/settings changes propagate quickly;
 // settings writes also call invalidateTenantCache() to make changes
 // instant for the editing user.
+//
+// We deliberately do NOT cache null lookups. Two reasons:
+//
+//   1. First-ever sign-in race: /oauth/callback calls findTenantForEmail()
+//      pre-provision (returns null → would cache null), then provisions
+//      the tenant, then issues a session cookie, then redirects to
+//      /admin/onboarding — which calls findTenantForEmail() AGAIN inside
+//      requireAdmin. A stale cached null at step 4 makes requireAdmin
+//      bounce the brand-new user back to /admin/login, looking like a
+//      silent login failure. (This was the actual root cause of the
+//      "test users can't sign in" bug; the regression was introduced
+//      when the cache was added — see git log of this file.)
+//
+//   2. "I just got added to a workspace" race: someone tried to sign in
+//      before being added as a member → we cached "no tenant" → admin
+//      adds them as a member → for the next 30s their sign-in still
+//      bounces because we serve the stale null.
+//
+// The cost of NOT caching nulls is one DB lookup per unknown-email request.
+// memberships.email has a unique index so it's a sub-ms point lookup.
 type TenantCacheEntry = {
-  value: { tenant: Tenant; membership: Membership } | null;
+  value: { tenant: Tenant; membership: Membership };
   expiresAt: number;
 };
 const TENANT_CACHE_TTL_MS = 30 * 1000;
@@ -106,7 +126,7 @@ export async function findTenantForEmail(
   if (error) throw new Error(`findTenantForEmail: ${error.message}`);
 
   if (!data) {
-    tenantCacheByEmail.set(key, { value: null, expiresAt: Date.now() + TENANT_CACHE_TTL_MS });
+    // See the comment block above: NEVER cache nulls.
     return null;
   }
 
