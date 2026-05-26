@@ -131,7 +131,9 @@ The app installs SIGTERM and SIGINT handlers (`src/server.ts`) that stop accepti
 // ecosystem.config.cjs
 module.exports = {
   apps: [{
-    name: 'hiagents',
+    // Process name is `inbox-ai` (not `hiagents`) — operational name kept
+    // from before the brand rename. Use `pm2 reload inbox-ai` etc.
+    name: 'inbox-ai',
     script: 'dist/server.js',
     instances: 1,
     autorestart: true,

@@ -98,6 +98,8 @@ Most of this is detailed in `docs/SAFETY-AUDIT.md` (Sections 1–11 + 12 verifie
 
 ## pm2
 
+**The pm2 process name is `inbox-ai`, NOT `hiagents`.** When telling the operator to deploy, always say `pm2 reload inbox-ai` / `pm2 restart inbox-ai` / `pm2 logs inbox-ai`. The operational identifiers (repo folder, GitHub remote, pm2 name) all kept their old `inbox-ai` names; only the user-facing brand changed to `hiagents`. The `ecosystem.config.cjs` `name` field reflects this on purpose — renaming would either need a manual `pm2 delete inbox-ai && pm2 start ecosystem.config.cjs` (downtime) or silently spawn a second process. Not worth it.
+
 Manifest at `ecosystem.config.cjs`. `kill_timeout: 20000` must be ≥ `SHUTDOWN_TIMEOUT_MS` (15000) in `src/server.ts`, otherwise pm2 will SIGKILL mid-drain on `pm2 reload`. The server installs SIGTERM + SIGINT handlers that stop accepting new connections and drain in-flight requests for up to 15s before exiting.
 
 ## Tests

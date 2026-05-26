@@ -11,7 +11,7 @@ Run this end-to-end before any cohort onboarding. Tick each box; if something fa
 - [ ] You're signed in to the Google account that's on the OAuth app's Test Users list
 - [ ] You have a PDF handy to upload (any document with a few pages of text)
 - [ ] You can send an email **from a different account** to the connected Gmail (the bot won't reply to mail from itself)
-- [ ] You're watching pm2 logs in another terminal: `pm2 logs hiagents` on the VPS
+- [ ] You're watching pm2 logs in another terminal: `pm2 logs inbox-ai` on the VPS
 
 ---
 
@@ -161,6 +161,6 @@ If your KB contains anything technical (CLI commands, code snippets, JSON exampl
 For anything that fails:
 1. Screenshot the page + DevTools Network tab if relevant
 2. Note the exact step number that failed
-3. Paste the contents of `pm2 logs hiagents --lines 50` from the VPS at the moment of failure
+3. Paste the contents of `pm2 logs inbox-ai --lines 50` from the VPS at the moment of failure
 
 For anything that's "works but feels wrong" — describe the expected behavior vs what actually happened. Those are usually the most valuable findings.

@@ -1,9 +1,18 @@
-// PM2 process manifest for hiagents.
+// PM2 process manifest.
+//
+// Process name is `inbox-ai` (not `hiagents`) — the repo folder, git remote,
+// and pm2 process all kept the operational name from before the brand
+// rename. Only the user-facing brand flipped to `hiagents`. Renaming the
+// pm2 process now would either (a) require a brief downtime + manual
+// `pm2 delete inbox-ai && pm2 start ecosystem.config.cjs`, or (b) silently
+// spawn a second process the next time anyone ran `pm2 start`. Not worth
+// it. Operator commands stay on the `inbox-ai` name; everything user-
+// facing already says `hiagents`.
 //
 // Deploy / restart:
 //   pm2 start ecosystem.config.cjs             # first time
-//   pm2 restart hiagents                       # after pulling new code
-//   pm2 logs hiagents                          # live tail logs
+//   pm2 restart inbox-ai                       # after pulling new code
+//   pm2 logs inbox-ai                          # live tail logs
 //   pm2 monit                                  # interactive dashboard
 //   pm2 save && pm2 startup                    # persist across reboots
 //
@@ -13,7 +22,7 @@
 module.exports = {
   apps: [
     {
-      name: 'hiagents',
+      name: 'inbox-ai',
       script: 'dist/server.js',
       // Run from the directory containing this file
       cwd: __dirname,
@@ -22,7 +31,7 @@ module.exports = {
       autorestart: true,
       watch: false,
       // App reads .env via dotenv at startup; we just set NODE_ENV here.
-      // Override PORT here per-client if running multiple hiagents instances
+      // Override PORT here per-client if running multiple inbox-ai instances
       // on the same VPS behind nginx (e.g. PORT: 3001 for client A, 3002 for B).
       env: {
         NODE_ENV: 'production',
