@@ -486,27 +486,67 @@
   .conn-email { font-weight: 500; }
   .conn-meta { color: var(--text-muted); font-size: 12px; }
 
-  /* ============ Banner ============ */
-  .banner {
-    padding: 12px 16px;
+  /* ============ Toast stack (top-right) ============
+     Replaces the old full-width inline banner. Stacks toasts vertically,
+     compact 360px max, slide-in from the right, auto-dismiss timer per
+     toast (set per-call in JS). Variants: success / error / info.       */
+  #toast-stack {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 360px;
+    width: calc(100vw - 40px);
+    pointer-events: none; /* let clicks pass through gaps */
+  }
+  .toast {
+    pointer-events: auto;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 11px 14px 11px 12px;
     border-radius: 10px;
-    margin-bottom: 16px;
     font-size: 13px;
-    display: none;
-    border: 1px solid;
+    line-height: 1.4;
+    background: white;
+    border: 1px solid var(--border-strong);
+    box-shadow: 0 6px 20px -4px rgba(15, 23, 42, 0.15), 0 2px 6px rgba(15, 23, 42, 0.08);
+    animation: toast-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
   }
-  .banner.show { display: flex; align-items: flex-start; gap: 12px; }
-  .banner-error { background: var(--danger-soft); border-color: #fca5a5; color: #7f1d1d; }
-  .banner .close {
-    margin-left: auto;
-    background: none; border: none;
-    color: inherit; opacity: 0.6;
-    font-size: 16px; line-height: 1;
-    cursor: pointer; padding: 0;
+  .toast.toast-leaving { animation: toast-out 0.18s cubic-bezier(0.4, 0, 1, 1) forwards; }
+  .toast-icon {
+    flex-shrink: 0;
+    width: 18px; height: 18px;
+    border-radius: 999px;
+    display: grid; place-items: center;
+    font-size: 11px; font-weight: 700;
+    margin-top: 1px;
   }
-  .banner .close:hover { opacity: 1; }
-  .banner-warn { background: #fef3c7; border-color: #fcd34d; color: #78350f; }
-  .banner-info { background: #dbeafe; border-color: #93c5fd; color: #1e3a8a; }
+  .toast-msg { flex: 1; color: var(--text); word-wrap: break-word; }
+  .toast-close {
+    background: none; border: none; padding: 2px 4px;
+    color: var(--text-muted); cursor: pointer;
+    font-size: 18px; line-height: 1;
+    margin: -2px -4px 0 0;
+    flex-shrink: 0;
+  }
+  .toast-close:hover { color: var(--text); }
+  .toast-success { border-color: #86efac; }
+  .toast-success .toast-icon { background: var(--success-soft); color: var(--success); }
+  .toast-error { border-color: #fca5a5; }
+  .toast-error .toast-icon { background: var(--danger-soft); color: var(--danger); }
+  .toast-info .toast-icon { background: var(--neutral-soft); color: var(--text-muted); }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes toast-out {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(20px); }
+  }
 
   /* ============ Modal (replaces native confirm) ============ */
   .modal-overlay {
@@ -668,12 +708,10 @@
       <div class="brand-name">hiagents</div>
     </header>
 
-    <main class="main">
-      <div id="global-error" class="banner banner-error">
-        <span id="global-error-msg"></span>
-        <button class="close" onclick="this.parentElement.classList.remove('show')">×</button>
-      </div>
+    <!-- Toast stack lives outside .main so it floats above all content -->
+    <div id="toast-stack" aria-live="polite" aria-atomic="false"></div>
 
+    <main class="main">
       <div id="paused-banner" class="paused-banner">
         <span><strong>Bot is paused.</strong> No inbound mail is being processed for this workspace.</span>
         <button type="button" id="resume-from-banner">Resume bot</button>
@@ -920,10 +958,65 @@ function showConfirm({ title, message, confirmText = 'Confirm', cancelText = 'Ca
     setTimeout(() => overlay.querySelector('[data-action="confirm"]')?.focus(), 10);
   });
 }
-function showError(msg) {
-  $('#global-error-msg').textContent = msg;
-  $('#global-error').classList.add('show');
+// ============================================================
+// Toast system — top-right stack, auto-dismiss, three variants.
+// Call: toast.success("…"), toast.error("…"), toast.info("…")
+// Each returns the toast id so callers can dismiss it manually if needed.
+//
+// Default durations: success/info 3.5s, error 6s (longer so the user has
+// time to read what went wrong before it disappears). Pass `0` to make
+// a toast sticky (no auto-dismiss); useful for ongoing-state messages.
+//
+// showError() kept as a back-compat alias that maps to toast.error so we
+// don't have to grep-and-fix every call site, but new code should use
+// the named variants directly.
+// ============================================================
+const TOAST_ICONS = { success: '✓', error: '!', info: 'i' };
+const TOAST_DEFAULT_MS = { success: 3500, info: 3500, error: 6000 };
+let toastIdSeq = 0;
+
+const toast = {
+  success(msg, opts) { return showToast(msg, 'success', opts); },
+  error(msg, opts) { return showToast(msg, 'error', opts); },
+  info(msg, opts) { return showToast(msg, 'info', opts); },
+  dismiss(id) { dismissToast(id); },
+};
+
+function showToast(msg, variant, opts) {
+  const stack = $('#toast-stack');
+  if (!stack) return null;
+  const id = ++toastIdSeq;
+  const durationMs = (opts && typeof opts.durationMs === 'number')
+    ? opts.durationMs
+    : TOAST_DEFAULT_MS[variant];
+  const el = document.createElement('div');
+  el.className = `toast toast-${variant}`;
+  el.dataset.toastId = String(id);
+  el.innerHTML = `
+    <div class="toast-icon">${TOAST_ICONS[variant] || ''}</div>
+    <div class="toast-msg"></div>
+    <button class="toast-close" aria-label="Dismiss">×</button>
+  `;
+  el.querySelector('.toast-msg').textContent = msg;
+  el.querySelector('.toast-close').addEventListener('click', () => dismissToast(id));
+  stack.appendChild(el);
+  if (durationMs > 0) {
+    setTimeout(() => dismissToast(id), durationMs);
+  }
+  return id;
 }
+
+function dismissToast(id) {
+  const stack = $('#toast-stack');
+  if (!stack) return;
+  const el = stack.querySelector(`[data-toast-id="${id}"]`);
+  if (!el) return;
+  el.classList.add('toast-leaving');
+  setTimeout(() => el.remove(), 200);
+}
+
+// Back-compat alias — new code should call toast.error / toast.success directly.
+function showError(msg) { toast.error(msg); }
 function relativeTime(iso) {
   if (!iso) return '—';
   const ms = Date.now() - new Date(iso).getTime();
@@ -1435,8 +1528,8 @@ async function loadSettings() {
 async function saveSettings(patch, msg) {
   try {
     await safeFetch('/admin/api/settings/', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) });
-    showError(msg + ' saved ✓');
-  } catch (e) { showError('Save failed: ' + e.message); }
+    toast.success(`${msg} saved`);
+  } catch (e) { toast.error(`Couldn't save ${msg.toLowerCase()}: ${e.message}`); }
 }
 
 $('#save-persona')?.addEventListener('click', () => saveSettings({
