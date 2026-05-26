@@ -179,8 +179,12 @@ oauthRouter.get('/callback', async (req, res) => {
     }
 
     // Dispatch on the flow kind. Each branch is self-contained.
+    // Both branches receive `tokens` because the sign-in flow now also
+    // saves Gmail mailbox tokens (requested in SIGNIN_SCOPES) — that's
+    // what folds onboarding from 4 steps to 3 and merges the two
+    // "Account" / "Gmail mailbox" cards in Settings into one.
     if (stateKind === 'login') {
-      await handleSigninFlow(req, res, email);
+      await handleSigninFlow(req, res, email, tokens);
       return;
     }
     if (stateKind === 'mailbox') {
@@ -218,20 +222,79 @@ async function handleSigninFlow(
   req: import('express').Request,
   res: import('express').Response,
   email: string,
+  tokens: {
+    access_token?: string | null;
+    refresh_token?: string | null;
+    expiry_date?: number | null;
+    scope?: string | null;
+  },
 ): Promise<void> {
   const found = await findTenantForEmail(email);
-  if (!found) {
-    const tenant = await provisionTenant(email);
-    auditFireAndForget(tenant.id, email, 'tenant.provisioned', { via: 'google-signin' });
-    logger.info({ email, tenantId: tenant.id }, 'auto-provisioned new tenant');
-    issueSessionForEmail(res, email, tenant.id);
-    auditFireAndForget(tenant.id, email, 'auth.signin', { method: 'google', ip: req.ip });
+  const tenantId = found ? found.tenant.id : (await provisionTenant(email)).id;
+  const isNewTenant = !found;
+
+  if (isNewTenant) {
+    auditFireAndForget(tenantId, email, 'tenant.provisioned', { via: 'google-signin' });
+    logger.info({ email, tenantId }, 'auto-provisioned new tenant');
+  }
+
+  // Save mailbox tokens — the whole point of folding the two OAuth flows
+  // into one. Three cases:
+  //   1. New tenant → always save (no existing mailbox).
+  //   2. Existing tenant, no mailbox connected yet → save.
+  //   3. Existing tenant, mailbox is already connected as the SAME email →
+  //      save (refresh of tokens for the same account).
+  //   4. Existing tenant, mailbox is connected as a DIFFERENT email →
+  //      do NOT overwrite. The user explicitly set up a split (admin
+  //      signs in as A, bot manages B). Silently overwriting B's
+  //      tokens would break their bot. Log + skip; they can use
+  //      "Use a different Google account" in Settings to switch
+  //      explicitly if they want.
+  //
+  // Token persistence requires a refresh_token. Sign-in with
+  // prompt='select_account consent' always returns one; if it ever
+  // doesn't we just skip the save (the user can re-OAuth from Settings).
+  if (tokens.access_token && tokens.refresh_token) {
+    const existing = await db()
+      .from('oauth_tokens')
+      .select('email')
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    const existingEmail = (existing.data as { email: string } | null)?.email ?? null;
+    const safeToOverwrite = !existingEmail || existingEmail.toLowerCase() === email;
+    if (safeToOverwrite) {
+      await saveTokensForTenant(
+        tenantId,
+        {
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+          expiry_date: tokens.expiry_date ?? Date.now() + 3500_000,
+          scope: tokens.scope ?? MAILBOX_SCOPES.join(' '),
+        },
+        email,
+      );
+      if (isNewTenant || !existingEmail) {
+        auditFireAndForget(tenantId, email, 'gmail.connected', { via: 'signin', ip: req.ip });
+        logger.info({ email, tenantId }, 'gmail mailbox connected during signin');
+      }
+    } else {
+      logger.info(
+        { signinEmail: email, mailboxEmail: existingEmail, tenantId },
+        'signin email differs from connected mailbox — keeping existing mailbox tokens',
+      );
+    }
+  }
+
+  issueSessionForEmail(res, email, tenantId);
+  auditFireAndForget(tenantId, email, 'auth.signin', { method: 'google', ip: req.ip });
+
+  // Where to land: brand-new tenant → onboarding. Existing tenant →
+  // wherever they were last (onboarding if incomplete, dashboard if done).
+  if (isNewTenant) {
     res.redirect('/admin/onboarding');
     return;
   }
-  auditFireAndForget(found.tenant.id, email, 'auth.signin', { method: 'google', ip: req.ip });
-  issueSessionForEmail(res, email, found.tenant.id);
-  res.redirect(found.tenant.onboardingCompletedAt ? '/admin' : '/admin/onboarding');
+  res.redirect(found!.tenant.onboardingCompletedAt ? '/admin' : '/admin/onboarding');
 }
 
 async function handleMailboxFlow(

@@ -841,11 +841,18 @@
 
         <div class="card">
           <div class="card-header">
-            <div><h2>Gmail mailbox</h2><p class="sub">The Gmail account the bot polls and replies from.</p></div>
-            <a class="btn btn-primary" href="/oauth/start">Reconnect Gmail</a>
+            <div>
+              <h2>Connected account</h2>
+              <p class="sub">The Google account you're signed in with — also the Gmail mailbox the bot polls and replies from.</p>
+            </div>
           </div>
           <div class="card-body">
-            <div id="gmail-status-settings" class="conn-row"><span class="conn-meta">Loading…</span></div>
+            <div id="connected-account-row" class="conn-row"><span class="conn-meta">Loading…</span></div>
+            <div id="connected-account-split-notice" style="display:none;margin-top:10px;padding:10px 12px;background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;font-size:12.5px;color:#78350f;line-height:1.5"></div>
+            <div style="margin-top:14px;display:flex;flex-wrap:wrap;align-items:center;gap:10px">
+              <a class="btn" href="/oauth/start" title="Switch which Gmail mailbox the bot polls — your admin sign-in stays the same">Use a different Gmail</a>
+              <span style="font-size:12px;color:var(--text-muted)">Mostly useful if you want to keep signing in as one account but have the bot manage another.</span>
+            </div>
           </div>
         </div>
 
@@ -886,16 +893,11 @@
           <div class="card-body"><div id="usage-summary"><div style="color:var(--text-muted)">Loading…</div></div></div>
         </div>
 
-        <div class="card">
-          <div class="card-header"><div><h2>Account</h2><p class="sub">Who's signed in.</p></div></div>
-          <div class="card-body">
-            <div class="conn-row">
-              <div class="avatar" id="settings-avatar">·</div>
-              <span class="conn-email" id="settings-email">—</span>
-              <span class="conn-meta" id="settings-method">—</span>
-            </div>
-          </div>
-        </div>
+        <!-- "Account" card removed — its info (who's signed in) is now
+             merged into the "Connected account" card at the top of
+             Settings, since after Option A the sign-in account and the
+             Gmail mailbox are the same in the common case. -->
+
 
         <div class="card" style="border-color:#fca5a5">
           <div class="card-header"><div><h2 style="color:var(--danger)">Danger zone</h2><p class="sub">Soft-delete this workspace and all its data. We hold for 30 days before hard delete.</p></div></div>
@@ -1170,34 +1172,79 @@ async function loadStatus() {
   try {
     const data = await safeFetch('/admin/api/status');
     const adminEmail = data.admin?.email;
-    if (adminEmail) {
-      $('#admin-email').textContent = adminEmail;
-      $('#admin-avatar').textContent = adminEmail.charAt(0);
-      $('#admin-sub').textContent = 'Google sign-in';
-      $('#settings-email').textContent = adminEmail;
-      $('#settings-avatar').textContent = adminEmail.charAt(0);
-      $('#settings-method').textContent = 'signed in via Google';
-    } else {
+    if (!adminEmail) {
       // No email in session — cookie was tampered or session corrupted.
       // requireAdmin would have already redirected; defensive fallback only.
       window.location.href = '/admin/login';
       return;
     }
-    // Gmail status (rendered in two places)
-    const statusHtml = data.gmail
+    // Sidebar admin chip (unchanged)
+    $('#admin-email').textContent = adminEmail;
+    $('#admin-avatar').textContent = adminEmail.charAt(0);
+    $('#admin-sub').textContent = 'Google sign-in';
+
+    // Overview tab — Gmail connection card (kept as a quick-glance widget)
+    const gmailEmail = data.gmail?.email ?? null;
+    const overviewStatusHtml = data.gmail
       ? `<span class="pill pill-connected">Connected</span>
-         <span class="conn-email">${escapeHtml(data.gmail.email)}</span>
+         <span class="conn-email">${escapeHtml(gmailEmail)}</span>
          <span class="conn-meta">Updated ${relativeTime(data.gmail.updated_at)}</span>`
       : `<span class="pill pill-disconnected">Not connected</span>
          <span class="conn-meta">The bot won't poll or reply until Gmail is connected.</span>`;
-    $('#gmail-status').innerHTML = statusHtml;
-    $('#gmail-status-settings').innerHTML = statusHtml;
+    $('#gmail-status').innerHTML = overviewStatusHtml;
+
+    // Settings tab — unified "Connected account" card (replaces the
+    // previous separate "Gmail mailbox" + "Account" cards). Three states:
+    //   1. Same email for admin + mailbox → one tidy row, no notice
+    //   2. Mailbox is a DIFFERENT email → show a yellow notice explaining
+    //      the split (this is the rare "I signed in as A but the bot
+    //      manages B" case kept around for power users)
+    //   3. No mailbox connected yet → red pill + nudge to re-sign-in
+    const row = $('#connected-account-row');
+    const splitNotice = $('#connected-account-split-notice');
+    if (!gmailEmail) {
+      row.innerHTML = `
+        <div class="avatar">${escapeHtml(adminEmail.charAt(0).toUpperCase())}</div>
+        <span class="conn-email">${escapeHtml(adminEmail)}</span>
+        <span class="pill pill-disconnected">Mailbox not connected</span>
+      `;
+      splitNotice.style.display = 'block';
+      splitNotice.innerHTML = `
+        You're signed in but the bot has no Gmail mailbox to poll yet.
+        <a href="/oauth/signin" style="color:#92400e;font-weight:500;text-decoration:underline">Re-sign-in</a>
+        to grant Gmail access.
+      `;
+    } else if (gmailEmail.toLowerCase() === adminEmail.toLowerCase()) {
+      // Single-account happy path
+      row.innerHTML = `
+        <div class="avatar">${escapeHtml(adminEmail.charAt(0).toUpperCase())}</div>
+        <span class="conn-email">${escapeHtml(adminEmail)}</span>
+        <span class="pill pill-connected">Connected</span>
+        <span class="conn-meta">via Google · updated ${relativeTime(data.gmail.updated_at)}</span>
+      `;
+      splitNotice.style.display = 'none';
+    } else {
+      // Split account: admin email ≠ mailbox email
+      row.innerHTML = `
+        <div class="avatar">${escapeHtml(adminEmail.charAt(0).toUpperCase())}</div>
+        <span class="conn-email">${escapeHtml(adminEmail)}</span>
+        <span class="conn-meta">signed in</span>
+      `;
+      splitNotice.style.display = 'block';
+      splitNotice.innerHTML = `
+        <strong>You're signed in as ${escapeHtml(adminEmail)}</strong>, but the bot polls
+        <strong>${escapeHtml(gmailEmail)}</strong> (updated ${relativeTime(data.gmail.updated_at)}).
+        This split is fine — admin sign-in and the polled mailbox can be different.
+        Use <em>Use a different Gmail</em> below if you want to switch the polled mailbox.
+      `;
+    }
+
     // Pause state (sidebar button + persistent banner)
     if (data.tenant && typeof data.tenant.paused === 'boolean') {
       renderPauseState(data.tenant.paused);
     }
   } catch (err) {
-    showError('Failed to load status: ' + err.message);
+    toast.error('Failed to load status: ' + err.message);
   }
 }
 

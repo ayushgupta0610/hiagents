@@ -119,7 +119,9 @@ Last updated: 2026-05-22 (second revision)
 |---|---|---|---|
 | F.1 | Auto-provisioned workspace on first Google sign-in | ✅ Shipped | All tiers |
 | F.2 | One owner per workspace (the email that signed up) | ✅ Shipped | All tiers |
-| F.3 | Four-step onboarding wizard (Set up workspace / Gmail / Knowledge / Review) — workspace name, persona, and classifier prompt combined into one Set-up card | ✅ Shipped | All tiers |
+| F.3 | Three-step onboarding wizard (Set up workspace / Knowledge / Review) — Gmail is granted at sign-in via the unified OAuth flow, so there's no separate Connect-Gmail step. Workspace name, persona, and classifier prompt are combined into one Set-up card. | ✅ Shipped | All tiers |
+| F.3a | Unified Google OAuth — sign-in requests identity + Gmail scopes in one consent screen, so the very first OAuth dance also connects the mailbox. Saves one click + collapses the duplicate "Account" / "Gmail mailbox" cards in Settings into one "Connected account" card. | ✅ Shipped | All tiers |
+| F.3b | "Use a different Gmail" escape hatch in Settings — keeps the rare power-user case of "admin signs in as A, bot polls B" working without forcing it on everyone. | ✅ Shipped | All tiers |
 | F.4 | "Start over with a different account" during onboarding | ✅ Shipped | All tiers |
 | F.5 | Soft-delete workspace (30-day grace before hard delete) | ✅ Shipped | All tiers |
 | F.6 | Invite teammates as additional admins / viewers | 🗺 Roadmap | Pro+ |

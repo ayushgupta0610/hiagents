@@ -83,10 +83,6 @@
       <div class="progress-bar"></div>
       <div class="progress-label">Set up</div>
     </div>
-    <div class="progress-step" data-step="mailbox" title="Connect the Gmail account the bot will poll and reply from">
-      <div class="progress-bar"></div>
-      <div class="progress-label">Gmail</div>
-    </div>
     <div class="progress-step" data-step="kb" title="Upload PDFs the bot will draw answers from">
       <div class="progress-bar"></div>
       <div class="progress-label">Knowledge</div>
@@ -147,16 +143,11 @@
     </div>
   </section>
 
-  <section class="card step" id="step-mailbox" style="display:none">
-    <h1>Connect your Gmail</h1>
-    <p class="sub">The bot polls this mailbox every minute and replies on its behalf. We use Google's official OAuth — your credentials never touch our servers.</p>
-    <div id="mailbox-status" style="margin-bottom:16px"></div>
-    <div class="actions">
-      <button type="button" class="btn" data-back="setup">← Back</button>
-      <a class="btn btn-primary" href="/oauth/start">Connect Gmail</a>
-      <button class="btn" id="mailbox-refresh">I've connected — refresh status</button>
-    </div>
-  </section>
+  <!-- Mailbox step deliberately removed — the unified sign-in flow grants
+       Gmail scopes at signin and saves the tokens (see handleSigninFlow in
+       src/routes/oauth.ts). If a user wants the bot to manage a DIFFERENT
+       Gmail than the one they signed in with, they switch from
+       Settings → Connected account → Use a different Google account. -->
 
   <section class="card step" id="step-kb" style="display:none">
     <h1>Upload your knowledge base</h1>
@@ -164,7 +155,7 @@
     <label class="file-area" for="kb-file">Drop a PDF here, or click to choose<input type="file" id="kb-file" accept="application/pdf" multiple></label>
     <div id="kb-upload-status"></div>
     <div class="actions">
-      <button type="button" class="btn" data-back="mailbox">← Back</button>
+      <button type="button" class="btn" data-back="setup">← Back</button>
       <button class="btn btn-primary" id="kb-next" disabled>Continue</button>
     </div>
   </section>
@@ -265,19 +256,46 @@ async function loadState() {
   const s = await api('/admin/onboarding/api/state');
   markDone(s.steps);
   if (s.steps.done) { window.location.href = '/admin'; return; }
-  // Onboarding order: Set up → Gmail → Knowledge → Review.
-  // The combined "Set up" step covers workspace name + persona + classifier
-  // prompt in one card. The server still tracks each as a separate boolean
-  // so back-fills work, but in the UI they share a single Continue.
-  // We treat the setup step as "done" only when ALL three sub-steps are done:
-  // workspace (welcome) AND persona AND classifier-acknowledged.
+  // Onboarding order: Set up → Knowledge → Review.
+  // - Set up: workspace name + persona + classifier prompt (combined card)
+  // - Knowledge: PDF upload
+  // - Review: confirm + go to dashboard
+  //
+  // Gmail mailbox is granted at sign-in (SIGNIN_SCOPES now includes the
+  // mailbox scopes), so steps.mailbox is true by the time the user lands
+  // here — no separate Gmail card. Existing pre-Option-A users who still
+  // have steps.mailbox=false will see a one-line banner inside the Setup
+  // card asking them to re-sign-in to grant the new scopes.
   if (!s.steps.welcome || !s.steps.persona) {
     prefillSetup(s);
+    if (!s.steps.mailbox) showLegacyReconnectBanner();
     return show('setup');
   }
-  if (!s.steps.mailbox) { await refreshMailbox(); return show('mailbox'); }
+  if (!s.steps.mailbox) {
+    // Edge case: existing user whose tenant pre-dates Option A and never
+    // got mailbox tokens saved at signin. Send them through /oauth/signin
+    // again — Google will re-prompt because the scope set expanded.
+    showLegacyReconnectBanner();
+    return show('setup');
+  }
   if (!s.steps.kb) return show('kb');
   return renderSummaryAndGoDone();
+}
+
+// Pre-Option-A users land here without mailbox tokens. Tell them to
+// re-sign-in once so we get the now-expanded scope set. After that this
+// banner never fires again for their tenant.
+function showLegacyReconnectBanner() {
+  let el = document.getElementById('legacy-reconnect-banner');
+  if (el) { el.style.display = ''; return; }
+  el = document.createElement('div');
+  el.id = 'legacy-reconnect-banner';
+  el.style.cssText = 'margin-bottom:16px;padding:12px 14px;border:1px solid #fcd34d;background:#fef3c7;color:#78350f;border-radius:8px;font-size:13px;line-height:1.5';
+  el.innerHTML = `
+    <strong>One quick re-sign-in needed.</strong> We just simplified onboarding — sign-in now grants Gmail access in the same step.
+    <a href="/oauth/signin" style="color:#7c3aed;text-decoration:underline;font-weight:500">Re-sign-in →</a>
+  `;
+  document.querySelector('.shell').insertBefore(el, document.getElementById('err').nextSibling);
 }
 
 // If a user got partway through onboarding before, prefill the setup form
@@ -326,17 +344,9 @@ document.getElementById('setup-next').addEventListener('click', async () => {
   }
 });
 
-async function refreshMailbox() {
-  const s = await api('/admin/onboarding/api/state');
-  const el = document.getElementById('mailbox-status');
-  if (s.steps.mailbox) {
-    el.innerHTML = `<div class="uploaded">✓ Connected</div>`;
-    setTimeout(() => loadState(), 600);
-  } else {
-    el.innerHTML = `<div style="color:var(--muted);font-size:13px">Not connected yet. Click <strong>Connect Gmail</strong>, complete the Google flow, then return here.</div>`;
-  }
-}
-document.getElementById('mailbox-refresh').addEventListener('click', refreshMailbox);
+// refreshMailbox + mailbox-refresh button deliberately gone — the mailbox
+// is connected at sign-in now, so there's no separate "I've connected,
+// please refresh" loop to manage.
 
 document.querySelectorAll('.tone-chip').forEach(el => el.addEventListener('click', () => {
   document.querySelectorAll('.tone-chip').forEach(c => c.classList.remove('active'));
@@ -407,9 +417,9 @@ async function renderSummaryAndGoDone() {
   // markup safety. Other labels are static strings.
   const lines = [
     { label: `Workspace: ${escapeHtml(s.tenant.name)}`, ok: true },
+    { label: `Gmail connected`, ok: s.steps.mailbox },
     { label: `Persona configured`, ok: s.steps.persona },
     { label: `Classifier ready`, ok: true },
-    { label: `Gmail connected`, ok: s.steps.mailbox },
     { label: `Knowledge base populated`, ok: s.steps.kb },
   ];
   sum.innerHTML = lines.map(l => `<div class="summary-row"><span class="check">${l.ok ? '✓' : '·'}</span>${l.label}</div>`).join('');
@@ -461,7 +471,7 @@ loadState().catch((e) => {
   // Render the first step so the page isn't a dead shell.
   show('setup');
 });
-if (location.hash === '#mailbox-return') refreshMailbox();
+// Old `#mailbox-return` deep link removed alongside the mailbox step.
 </script>
 </body>
 </html>

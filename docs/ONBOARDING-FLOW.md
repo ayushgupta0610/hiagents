@@ -6,15 +6,18 @@ When a user signs in for the first time via Google:
 2. **Look up `memberships where email = ?`** — if none, `provisionTenant(email)` creates a new `tenants` row + `memberships(role=owner)` row
 3. **Set session cookie** carrying `(email, tenant_id, ts, HMAC)`
 4. **Redirect to `/admin/onboarding`** (or `/admin` if onboarding already complete)
-5. **Wizard steps** (`src/ui/onboarding.html`) — 4 visible cards, in this order:
+5. **Wizard steps** (`src/ui/onboarding.html`) — 3 visible cards, in this order:
    - **Set up** — single card combining three POSTs (all fired in parallel on Continue):
      - Workspace name → `tenants.name` (required)
      - Persona: `signature`, `tone`, `companyDescription` → `tenant.settings.persona` (companyDescription optional; the model falls back to a generic "the recipient" framing if empty, see `src/pipeline/generate.ts`). The POST also sets `tenant.settings.persona.configured = true` so the step-done check doesn't depend on the optional companyDescription field.
      - Classifier prompt → `tenant.settings.classifier.prompt` (optional; leave empty for the smart default)
-   - **Mailbox** — runs the mailbox-connect OAuth flow with `state=mailbox:<tenant_id>:<nonce>`. On return, polls `/admin/onboarding/api/state` until `mailbox: true`.
    - **Knowledge** — uploads at least one PDF; reuses `/admin/api/documents`.
    - **Review** — sets `tenants.onboarding_completed_at`, summarises the result, redirects to `/admin`.
 6. **Redirect to `/admin`**
+
+The Gmail mailbox is granted at sign-in via the unified OAuth flow (Option A): `SIGNIN_SCOPES` in `src/providers/gmail.ts` includes the full mailbox scope set, and `handleSigninFlow` in `src/routes/oauth.ts` saves the resulting tokens at the same time it issues the session cookie. No separate Connect-Gmail step inside onboarding.
+
+If a user needs the bot to manage a *different* Gmail than the one they signed in with, they go to **Settings → Connected account → Use a different Gmail**, which fires `/oauth/start` with the mailbox-only scope set and overwrites the stored tokens. Audit row: `gmail.connected`. The legacy `/oauth/start` route is preserved for exactly this reason.
 
 If a user revisits `/admin` while `onboarding_completed_at` is null, they're redirected to the wizard. The poller skips tenants whose onboarding isn't complete.
 

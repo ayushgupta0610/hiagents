@@ -8,6 +8,7 @@ import { encryptToken, decryptToken } from '../lib/crypto.js';
 import type { IncomingEmail } from '../types.js';
 import type { ThreadMessage } from '../pipeline/thread-guard.js';
 
+// Scopes the bot needs to actually do its job on a Gmail mailbox.
 export const MAILBOX_SCOPES = [
   'https://www.googleapis.com/auth/gmail.readonly',
   'https://www.googleapis.com/auth/gmail.send',
@@ -15,11 +16,23 @@ export const MAILBOX_SCOPES = [
   'https://www.googleapis.com/auth/userinfo.email',
 ];
 
-export const SIGNIN_SCOPES = [
+// Identity-only scopes — used to be the sign-in flow on its own. Now folded
+// into SIGNIN_SCOPES below so sign-in and mailbox-connect are one OAuth.
+// Kept exported in case a future "pure identity" flow needs them.
+export const IDENTITY_SCOPES = [
   'openid',
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
 ];
+
+// First-touch sign-in scopes. We deliberately request the full mailbox
+// scope set at sign-in, not just identity — so the very first OAuth dance
+// connects the user's Gmail too, dropping onboarding from 4 steps to 3
+// and collapsing the duplicate "Account" + "Gmail mailbox" cards in
+// Settings to one. The rare case of "I want to sign in as A but have the
+// bot manage B" is still supported via /oauth/start ("Use a different
+// Google account") in Settings.
+export const SIGNIN_SCOPES = Array.from(new Set([...IDENTITY_SCOPES, ...MAILBOX_SCOPES]));
 
 export const SCOPES = MAILBOX_SCOPES;
 
@@ -49,9 +62,15 @@ export function buildMailboxAuthUrl(state: string): string {
 
 export function buildSigninAuthUrl(state: string): string {
   const client = getOAuthClient();
+  // access_type=offline + prompt 'consent' is what makes Google reliably
+  // return a refresh_token. We need it because /oauth/signin now also
+  // grants the mailbox scopes — so the very first sign-in connects the
+  // Gmail mailbox (no separate /oauth/start step on the happy path).
+  // The 'select_account' part keeps the account picker visible so users
+  // with multiple Google accounts can pick the right one.
   return client.generateAuthUrl({
-    access_type: 'online',
-    prompt: 'select_account',
+    access_type: 'offline',
+    prompt: 'select_account consent',
     scope: SIGNIN_SCOPES,
     state,
   });
