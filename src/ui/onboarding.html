@@ -456,22 +456,35 @@ document.getElementById('start-over').addEventListener('click', async (ev) => {
   }
 });
 
+// Defensive default: show the Setup card BEFORE we even try to load
+// state. Reason — we've seen "blank shell" symptoms in the wild where
+// loadState throws an error so early or in such a way that even the
+// .catch() fail-open doesn't render anything. By showing setup first
+// and letting loadState() refine to a different step if appropriate,
+// the user ALWAYS has a usable page within the first paint, regardless
+// of what happens server-side. loadState() then either:
+//   - confirms setup is the right step (no-op visually), OR
+//   - switches to kb / done / launches the legacy reconnect banner, OR
+//   - throws → sticky error banner appears + setup stays on screen.
+show('setup');
+
 // On initial load: try to resolve the right step from server state. If
 // anything fails (network blip, /api/state error, tenant lookup race
-// after first sign-in, etc.) — fail OPEN to the Setup card so the user
-// has something to do, and pin a sticky diagnostic so they understand
-// what happened and can include the error code if they reach out.
+// after first sign-in, etc.) — pin a sticky diagnostic so the user
+// understands what happened and can include the error code if they
+// reach out. The Setup card is already visible from above.
 loadState().catch((e) => {
+  // Log full error to console so a developer can grab it from DevTools
+  // (the visible toast intentionally hides stack traces from users).
+  console.error('[onboarding] loadState failed:', e);
   const codeSuffix = e.code ? ` [${e.code}]` : '';
+  const statusSuffix = e.status ? ` (HTTP ${e.status})` : '';
   showErr(
-    `We couldn't load your onboarding state: ${e.message}${codeSuffix}. ` +
+    `We couldn't load your onboarding state: ${e.message}${statusSuffix}${codeSuffix}. ` +
       `You can still fill in the form below — we'll save what you enter and re-check from there.`,
     { sticky: true },
   );
-  // Render the first step so the page isn't a dead shell.
-  show('setup');
 });
-// Old `#mailbox-return` deep link removed alongside the mailbox step.
 </script>
 </body>
 </html>
