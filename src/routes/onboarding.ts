@@ -56,10 +56,6 @@ onboardingRouter.get('/api/state', requireAdmin, async (_req, res) => {
     .eq('tenant_id', tenantId)
     .eq('status', 'ingested');
 
-  // Heuristic: "welcome" is done if the tenant name has been customised away from the
-  // auto-provisioned default (the email's local part).
-  const looksAutoProvisioned = tenant.name === (tenant.createdByEmail?.split('@')[0] ?? '');
-
   res.json({
     tenant: {
       id: tenant.id,
@@ -68,7 +64,19 @@ onboardingRouter.get('/api/state', requireAdmin, async (_req, res) => {
       onboardingCompletedAt: tenant.onboardingCompletedAt,
     },
     steps: {
-      welcome: !!tenant.name && !looksAutoProvisioned,
+      // `welcome` was previously gated on "name has been customised away
+      // from the email's local-part default" — but that backfired when a
+      // user explicitly *typed* the same local-part value: the server kept
+      // reporting welcome=false → loadState routed back to setup forever →
+      // the Continue button got stuck at "Saving…". Since provisionTenant()
+      // always sets the name to a non-empty string, "welcome done" now
+      // collapses to "the user has clicked Continue in the Setup card at
+      // least once" — which is exactly what persona.configured tracks (the
+      // unified Setup card submits welcome + persona + classifier in one
+      // batch). Keeping the welcome key around for back-compat with any
+      // client that still inspects it; semantically it's redundant with
+      // persona post-Option-A.
+      welcome: !!tenant.name,
       mailbox: !!oauth?.email,
       // Persona is "done" once the user has explicitly submitted the step at
       // least once. companyDescription is no longer required, so we can't use

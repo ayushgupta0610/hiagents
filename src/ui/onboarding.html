@@ -327,8 +327,8 @@ document.getElementById('setup-next').addEventListener('click', async () => {
   };
 
   const btn = document.getElementById('setup-next');
-  btn.disabled = true;
   const originalLabel = btn.textContent;
+  btn.disabled = true;
   btn.textContent = 'Saving…';
   try {
     await Promise.all([
@@ -338,9 +338,16 @@ document.getElementById('setup-next').addEventListener('click', async () => {
     ]);
     await loadState();
   } catch (e) {
+    showErr(e.message);
+  } finally {
+    // ALWAYS restore the button state — not only on the error path. If
+    // loadState routes the user to a different step (kb / done), the
+    // button gets hidden along with the Setup card so the restore is
+    // invisible; if it leaves the user on Setup (e.g. server state still
+    // looks unsaved for some reason), they can click again instead of
+    // staring at a stuck "Saving…".
     btn.disabled = false;
     btn.textContent = originalLabel;
-    showErr(e.message);
   }
 });
 
