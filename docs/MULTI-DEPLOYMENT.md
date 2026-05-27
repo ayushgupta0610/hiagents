@@ -65,7 +65,7 @@ Before running any commands on the VPS, have these ready:
 
 ```bash
 cd /root
-git clone <your-fork-url> hiagents-app
+git clone https://github.com/ayushgupta0610/hiagents.git hiagents-app
 cd hiagents-app
 npm install
 ```

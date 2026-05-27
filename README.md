@@ -24,7 +24,7 @@ A single deployment serves N tenants. Sign in with Google, get an auto-provision
 You'll need a Supabase project, an OpenRouter API key, and a Google OAuth client.
 
 ```bash
-git clone <your-fork-url> hiagents
+git clone https://github.com/ayushgupta0610/hiagents.git
 cd hiagents
 npm install
 cp .env.example .env       # fill in values; generation commands inline
