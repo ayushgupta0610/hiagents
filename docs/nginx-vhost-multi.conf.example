@@ -1,0 +1,65 @@
+# Example nginx config for TWO hiagents instances running side-by-side on
+# one VPS, one per domain. See docs/MULTI-DEPLOYMENT.md for the full setup.
+#
+# Each vhost is a separate file in /etc/nginx/sites-available/, both
+# symlinked into sites-enabled/. The two are reproduced here in one place
+# only as a reference — DO NOT drop this whole file into sites-enabled
+# verbatim, it has two `server { server_name … }` blocks that nginx will
+# refuse to load from a single file.
+#
+# After dropping each block into its own file:
+#   ln -s /etc/nginx/sites-available/bot.aiagencycorp.com /etc/nginx/sites-enabled/
+#   ln -s /etc/nginx/sites-available/app.hiagents.digital /etc/nginx/sites-enabled/
+#   nginx -t && systemctl reload nginx
+#   certbot --nginx -d bot.aiagencycorp.com
+#   certbot --nginx -d app.hiagents.digital
+
+# ────────────────────────────────────────────────────────────────────────
+# Instance 1 — bot.aiagencycorp.com (existing customer) → pm2 "inbox-ai"
+# ────────────────────────────────────────────────────────────────────────
+server {
+    listen 80;
+    listen [::]:80;
+    server_name bot.aiagencycorp.com;
+
+    client_max_body_size 30M;          # multer caps PDFs at 25 MB
+    proxy_read_timeout 300s;           # PDF ingest can take 30-90s
+    proxy_send_timeout 300s;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# ────────────────────────────────────────────────────────────────────────
+# Instance 2 — app.hiagents.digital (new domain) → pm2 "hiagents-app"
+# ────────────────────────────────────────────────────────────────────────
+server {
+    listen 80;
+    listen [::]:80;
+    server_name app.hiagents.digital;
+
+    client_max_body_size 30M;
+    proxy_read_timeout 300s;
+    proxy_send_timeout 300s;
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;          # ← different port
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_cache_bypass $http_upgrade;
+    }
+}

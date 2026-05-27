@@ -104,6 +104,10 @@ scripts/set-deploy-domain.sh app.hiagents.digital
 
 The script swaps the hostname across every doc + example config — singleton form (`bot.aiagencycorp.com`), the multi-client dash form (`bot-acme.aiagencycorp.com`), and the placeholder form (`bot.<client-slug>.aiagencycorp.com`) — and writes the new canonical value into `.deploy-domain` so subsequent runs know what to swap *from*. Runtime config is untouched; you still update the live `.env` (BASE_URL / DOMAIN / GOOGLE_REDIRECT_URI), the Google OAuth client's Authorized redirect URIs, the DNS A record, and the nginx vhost yourself.
 
+## Running multiple deployments on the same VPS
+
+If you want a second hiagents instance alongside the first (e.g. to add `app.hiagents.digital` while keeping an existing customer on `bot.aiagencycorp.com` untouched), see **[`docs/MULTI-DEPLOYMENT.md`](MULTI-DEPLOYMENT.md)**. It covers the parallel-clone pattern: separate Supabase project, separate Google OAuth client, separate pm2 process, separate nginx vhost, single VPS, single git repo.
+
 ## Tuning
 
 Per-tenant settings (persona, classifier prompt, similarity threshold, top-K, auto-send, polling pause, per-sender / per-tenant / spend caps) live in `tenants.settings` JSONB and are edited in the per-workspace Settings UI — **not** via env vars.

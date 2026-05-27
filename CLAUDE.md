@@ -98,9 +98,15 @@ Most of this is detailed in `docs/SAFETY-AUDIT.md` (Sections 1–11 + 12 verifie
 
 ## pm2
 
-**The pm2 process name is `inbox-ai`, NOT `hiagents`.** When telling the operator to deploy, always say `pm2 reload inbox-ai` / `pm2 restart inbox-ai` / `pm2 logs inbox-ai`. The operational identifiers (repo folder, GitHub remote, pm2 name) all kept their old `inbox-ai` names; only the user-facing brand changed to `hiagents`. The `ecosystem.config.cjs` `name` field reflects this on purpose — renaming would either need a manual `pm2 delete inbox-ai && pm2 start ecosystem.config.cjs` (downtime) or silently spawn a second process. Not worth it.
+**The pm2 process name for the *primary* deployment is `inbox-ai`, NOT `hiagents`.** When telling the operator to deploy, always say `pm2 reload inbox-ai` / `pm2 restart inbox-ai` / `pm2 logs inbox-ai`. The operational identifiers (repo folder, GitHub remote, pm2 name) all kept their old `inbox-ai` names; only the user-facing brand changed to `hiagents`. The `ecosystem.config.cjs` `name` field reflects this on purpose — renaming would either need a manual `pm2 delete inbox-ai && pm2 start ecosystem.config.cjs` (downtime) or silently spawn a second process. Not worth it.
+
+If the operator runs multiple deployments side-by-side on the same VPS (e.g. one per domain), each clone gets its *own* pm2 name — see `docs/MULTI-DEPLOYMENT.md`. The "always say `inbox-ai`" rule still applies to the primary; secondary deployments use whatever name the operator chose in their clone's `ecosystem.config.cjs`.
 
 Manifest at `ecosystem.config.cjs`. `kill_timeout: 20000` must be ≥ `SHUTDOWN_TIMEOUT_MS` (15000) in `src/server.ts`, otherwise pm2 will SIGKILL mid-drain on `pm2 reload`. The server installs SIGTERM + SIGINT handlers that stop accepting new connections and drain in-flight requests for up to 15s before exiting.
+
+## Hosting model
+
+**This app runs on a long-lived Node process behind nginx + pm2. Do not propose moving it to Vercel / Cloudflare Workers / any serverless target.** Three things in the codebase fight serverless head-on: the `node-cron` mailbox poller (continuous 60s loop), the daily cleanup cron, and the in-process caches + SIGTERM graceful drain. Moving to serverless = ~40% of the backend rewritten. The `hiagents-digital` marketing site is on Vercel because it's pure HTTP, but the product belongs on a VPS.
 
 ## Tests
 
