@@ -8,19 +8,19 @@
 # refuse to load from a single file.
 #
 # After dropping each block into its own file:
-#   ln -s /etc/nginx/sites-available/bot.aiagencycorp.com /etc/nginx/sites-enabled/
+#   ln -s /etc/nginx/sites-available/bot.example.com /etc/nginx/sites-enabled/
 #   ln -s /etc/nginx/sites-available/app.hiagents.digital /etc/nginx/sites-enabled/
 #   nginx -t && systemctl reload nginx
-#   certbot --nginx -d bot.aiagencycorp.com
+#   certbot --nginx -d bot.example.com
 #   certbot --nginx -d app.hiagents.digital
 
 # ────────────────────────────────────────────────────────────────────────
-# Instance 1 — bot.aiagencycorp.com (existing customer) → pm2 "inbox-ai"
+# Instance 1 — bot.example.com (existing customer) → pm2 "inbox-ai"
 # ────────────────────────────────────────────────────────────────────────
 server {
     listen 80;
     listen [::]:80;
-    server_name bot.aiagencycorp.com;
+    server_name bot.example.com;
 
     client_max_body_size 30M;          # multer caps PDFs at 25 MB
     proxy_read_timeout 300s;           # PDF ingest can take 30-90s

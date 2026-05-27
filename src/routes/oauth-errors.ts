@@ -8,6 +8,7 @@
 // tells them what to do next.
 
 import type { Response } from 'express';
+import { env } from '../config.js';
 
 function escapeHtml(value: string): string {
   return value
@@ -126,8 +127,9 @@ export function explainGoogleError(
         title: "Google didn't let us in",
         message:
           "Either you cancelled the sign-in, or Google blocked your email from accessing this app.",
-        hint:
-          'If you saw an <strong>“Access blocked”</strong> screen, this app is currently in private testing and your Google account isn\'t on the test-users list yet. Reply to your invite email or contact <a href="mailto:hi@hiagents.digital" style="color:var(--amber)">hi@hiagents.digital</a> with the address you tried, and we\'ll add you within a day.',
+        hint: env.SUPPORT_EMAIL
+          ? `If you saw an <strong>“Access blocked”</strong> screen, this app is currently in private testing and your Google account isn\'t on the test-users list yet. Reply to your invite email or contact <a href="mailto:${env.SUPPORT_EMAIL}" style="color:var(--amber)">${env.SUPPORT_EMAIL}</a> with the address you tried, and we\'ll add you within a day.`
+          : 'If you saw an <strong>“Access blocked”</strong> screen, this app is currently in private testing and your Google account isn\'t on the test-users list yet. Reach out to whoever invited you with the address you tried.',
       };
     case 'admin_policy_enforced':
       return {

@@ -64,11 +64,11 @@ test.describe("Marketing site (hiagents.digital)", () => {
     await expect(firstFaq).toHaveAttribute("open", "");
   });
 
-  test("no link to app.hiagents.digital or bot.aiagencycorp.com (waitlist-only mode)", async ({ page }) => {
+  test("no link to app.hiagents.digital or bot.example.com (waitlist-only mode)", async ({ page }) => {
     await page.goto(MARKETING_URL);
     const html = await page.content();
     expect(html, "marketing site must not link to the app while we're waitlist-only").not.toMatch(
-      /app\.hiagents\.digital|bot\.aiagencycorp\.com/i,
+      /app\.hiagents\.digital|bot\.example\.com/i,
     );
   });
 

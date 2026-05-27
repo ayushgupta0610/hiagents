@@ -197,8 +197,8 @@ Last audit: 2026-05-21. Re-reviewed 2026-05-22 with most P0s + several P1s shipp
 **Risk if missed:** can't sell into regulated industries. Google OAuth verification can't be completed without privacy + ToS.
 
 **Immediate action items:**
-1. Publish a privacy policy at `aiagencycorp.com/privacy` (any reasonable boilerplate gets you started; have a lawyer review before signing first regulated customer).
-2. Publish ToS at `aiagencycorp.com/terms`.
+1. Publish a privacy policy at `example.com/privacy` (any reasonable boilerplate gets you started; have a lawyer review before signing first regulated customer).
+2. Publish ToS at `example.com/terms`.
 3. Submit OAuth app for Google verification.
 
 ---

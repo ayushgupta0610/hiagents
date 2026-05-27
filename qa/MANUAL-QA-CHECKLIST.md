@@ -19,7 +19,7 @@ Run this end-to-end before any cohort onboarding. Tick each box; if something fa
 
 If you need a clean run, soft-delete your tenant first via the dashboard's Danger zone or wait 30 days after a prior reset.
 
-- [ ] Visit `https://bot.aiagencycorp.com/admin/login` — page renders with the dark theme + Google button + no password field
+- [ ] Visit `https://bot.example.com/admin/login` — page renders with the dark theme + Google button + no password field
 - [ ] Click **Continue with Google** → Google's consent screen opens
 - [ ] Approve → land on `/admin/onboarding` with the progress bar showing **Set up** as current
 - [ ] **Set up card**:

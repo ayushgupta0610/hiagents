@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ownerHasReplied } from '../../src/pipeline/thread-guard.js';
 
-const OWNER = 'ayush@aiagencycorp.com';
+const OWNER = 'owner@example.com';
 
 describe('ownerHasReplied', () => {
   it('returns false when thread has only inbound messages', () => {
@@ -29,12 +29,12 @@ describe('ownerHasReplied', () => {
   });
 
   it('is case-insensitive on email comparison', () => {
-    const thread = [{ from: 'AYUSH@AIAGENCYCORP.COM', gmailMessageId: 'human-1' }];
+    const thread = [{ from: 'OWNER@EXAMPLE.COM', gmailMessageId: 'human-1' }];
     expect(ownerHasReplied(thread, OWNER, new Set())).toBe(true);
   });
 
   it('matches owner via angle-bracket From format', () => {
-    const thread = [{ from: 'Ayush Gupta <ayush@aiagencycorp.com>', gmailMessageId: 'h' }];
+    const thread = [{ from: 'Owner Name <owner@example.com>', gmailMessageId: 'h' }];
     expect(ownerHasReplied(thread, OWNER, new Set())).toBe(true);
   });
 });

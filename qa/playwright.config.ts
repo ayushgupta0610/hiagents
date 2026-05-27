@@ -12,7 +12,7 @@ import { defineConfig, devices } from "@playwright/test";
 export const MARKETING_URL =
   process.env.HIAGENTS_MARKETING_URL ?? "https://hiagents.digital";
 export const APP_URL =
-  process.env.HIAGENTS_APP_URL ?? "https://bot.aiagencycorp.com";
+  process.env.HIAGENTS_APP_URL ?? "https://bot.example.com";
 
 export default defineConfig({
   testDir: "./tests",

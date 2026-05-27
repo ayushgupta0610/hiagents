@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { APP_URL } from "../playwright.config";
 
-// Unauthenticated surfaces of the hiagents app at bot.aiagencycorp.com.
+// Unauthenticated surfaces of the hiagents app at bot.example.com.
 //   - /health endpoint
 //   - /admin/login renders Google-only sign-in (no password fallback)
 //   - / redirects to /admin/login
@@ -9,7 +9,7 @@ import { APP_URL } from "../playwright.config";
 //   - /admin (dashboard) redirects to /admin/login when unauthenticated
 //   - Security headers present (CSP, HSTS in prod, X-Frame-Options DENY)
 
-test.describe("App public surfaces (bot.aiagencycorp.com)", () => {
+test.describe("App public surfaces (bot.example.com)", () => {
   test("/health returns ok", async ({ request }) => {
     const res = await request.get(`${APP_URL}/health`);
     expect(res.ok()).toBeTruthy();

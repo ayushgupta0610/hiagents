@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - A VPS with a public IP (Hostinger VPS works).
-- A domain (or subdomain) pointed at the VPS IP via an A record (e.g., `bot.<client-slug>.aiagencycorp.com` → `198.51.100.7`).
+- A domain (or subdomain) pointed at the VPS IP via an A record (e.g., `bot.<client-slug>.example.com` → `198.51.100.7`).
 - A Supabase project (free tier is fine to start).
 - Docker + Docker Compose installed on the VPS.
 - A Google Cloud OAuth client (see [GMAIL-OAUTH-SETUP.md](GMAIL-OAUTH-SETUP.md)).
@@ -12,8 +12,8 @@
 
 If you're hosting deployments for multiple clients, host each on a subdomain of **your** domain (not the client's), e.g.:
 
-- `bot-acme.aiagencycorp.com` → Acme's deployment
-- `bot-foo.aiagencycorp.com` → Foo's deployment
+- `bot-acme.example.com` → Acme's deployment
+- `bot-foo.example.com` → Foo's deployment
 
 This means YOU add the DNS A record (zero friction for the client) and you control the SSL termination. The client only needs to (a) click "Connect Gmail" in the admin UI and (b) drop their PDFs in. No DNS, no infrastructure on their side.
 
@@ -64,7 +64,7 @@ Caddy will auto-provision a Let's Encrypt cert on first request to your `DOMAIN`
 
 ## Connect Gmail
 
-1. Open `https://bot.aiagencycorp.com/admin/login`.
+1. Open `https://bot.example.com/admin/login`.
 2. Sign in with Google (Google sign-in is the only way in — no password fallback).
 3. A new workspace is auto-provisioned on first signin; the onboarding wizard runs.
 4. In the wizard's Mailbox step, click "Connect Gmail" and complete the OAuth consent (the unverified-app warning is expected until you submit for verification — see GMAIL-OAUTH-SETUP.md).
@@ -96,17 +96,17 @@ docker compose logs -f caddy
 
 ## Changing the canonical deploy domain
 
-If you ever need to move the deployment from `bot.aiagencycorp.com` to another hostname (e.g. `app.hiagents.digital`), run:
+If you ever need to move the deployment from `bot.example.com` to another hostname (e.g. `bot.example.com`), run:
 
 ```bash
-scripts/set-deploy-domain.sh app.hiagents.digital
+scripts/set-deploy-domain.sh bot.example.com
 ```
 
-The script swaps the hostname across every doc + example config — singleton form (`bot.aiagencycorp.com`), the multi-client dash form (`bot-acme.aiagencycorp.com`), and the placeholder form (`bot.<client-slug>.aiagencycorp.com`) — and writes the new canonical value into `.deploy-domain` so subsequent runs know what to swap *from*. Runtime config is untouched; you still update the live `.env` (BASE_URL / DOMAIN / GOOGLE_REDIRECT_URI), the Google OAuth client's Authorized redirect URIs, the DNS A record, and the nginx vhost yourself.
+The script swaps the hostname across every doc + example config — singleton form (`bot.example.com`), the multi-client dash form (`bot-acme.example.com`), and the placeholder form (`bot.<client-slug>.example.com`) — and writes the new canonical value into `.deploy-domain` so subsequent runs know what to swap *from*. Runtime config is untouched; you still update the live `.env` (BASE_URL / DOMAIN / GOOGLE_REDIRECT_URI), the Google OAuth client's Authorized redirect URIs, the DNS A record, and the nginx vhost yourself.
 
 ## Running multiple deployments on the same VPS
 
-If you want a second hiagents instance alongside the first (e.g. to add `app.hiagents.digital` while keeping an existing customer on `bot.aiagencycorp.com` untouched), see **[`docs/MULTI-DEPLOYMENT.md`](MULTI-DEPLOYMENT.md)**. It covers the parallel-clone pattern: separate Supabase project, separate Google OAuth client, separate pm2 process, separate nginx vhost, single VPS, single git repo.
+If you want a second hiagents instance alongside the first (e.g. to add `bot.example.com` while keeping an existing customer on `bot.example.com` untouched), see **[`docs/MULTI-DEPLOYMENT.md`](MULTI-DEPLOYMENT.md)**. It covers the parallel-clone pattern: separate Supabase project, separate Google OAuth client, separate pm2 process, separate nginx vhost, single VPS, single git repo.
 
 ## Tuning
 
@@ -159,8 +159,8 @@ hiagents is now multi-tenant. A single deployment serves N tenants. Steps that c
 - **No `ADMIN_PASSWORD` env var either.** The password fallback login is gone — Google sign-in is the only way in. Replaced by `SESSION_SECRET` (for HMAC) and `TOKEN_ENCRYPTION_KEY` (for OAuth-token AES encryption).
 - **No tenant-specific persona / threshold env vars.** Per-tenant config lives in the `tenants.settings` JSONB column and is edited via the Settings UI. The env-level defaults (`SIMILARITY_THRESHOLD`, `TONE`, `SIGNATURE`, `COMPANY_DESCRIPTION`, etc.) are NO LONGER read by the running pipeline — only `defaultTenantSettings()` in code matters.
 - **Reply + classifier model are deployment-wide.** Tenants don't pick — there's no model dropdown in Settings anymore. To change the model, edit `defaultTenantSettings()` in `src/tenant/types.ts` and redeploy.
-- **Single deployment, single domain.** All tenants share `bot.aiagencycorp.com`. Tenant context is derived from the signed-in user's email.
-- **Pre-add OAuth redirect URI**: `https://bot.aiagencycorp.com/oauth/callback` (just one — used for both sign-in and mailbox-connect flows, disambiguated via `state` param).
+- **Single deployment, single domain.** All tenants share `bot.example.com`. Tenant context is derived from the signed-in user's email.
+- **Pre-add OAuth redirect URI**: `https://bot.example.com/oauth/callback` (just one — used for both sign-in and mailbox-connect flows, disambiguated via `state` param).
 - **Run migration 002** in the Supabase SQL editor before redeploying — see [MIGRATION-002-RUNBOOK.md](MIGRATION-002-RUNBOOK.md).
 - **One Supabase project**, no longer one-per-client. RLS + per-query tenant scoping enforce isolation.
 - **New routes mounted in `server.ts`**: `/admin/api/settings` (settings + usage + delete) and `/admin/onboarding` (wizard).

@@ -33,6 +33,7 @@ import {
   stateEquals,
 } from './oauth-state.js';
 import { renderOAuthError, explainGoogleError } from './oauth-errors.js';
+import { env } from '../config.js';
 
 export const oauthRouter: Router = Router();
 
@@ -205,8 +206,9 @@ oauthRouter.get('/callback', async (req, res) => {
     renderOAuthError(res, {
       status: 500,
       title: 'Sign-in failed',
-      message:
-        'We couldn\'t complete the sign-in. Try again — and if this keeps happening, email <a href="mailto:hi@hiagents.digital" style="color:var(--amber)">hi@hiagents.digital</a> with what you were trying to do.',
+      message: env.SUPPORT_EMAIL
+        ? `We couldn\'t complete the sign-in. Try again — and if this keeps happening, email <a href="mailto:${env.SUPPORT_EMAIL}" style="color:var(--amber)">${env.SUPPORT_EMAIL}</a> with what you were trying to do.`
+        : "We couldn't complete the sign-in. Try again.",
       backHref,
       backText,
     });

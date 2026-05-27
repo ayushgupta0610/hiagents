@@ -37,7 +37,7 @@ If a user revisits `/admin` while `onboarding_completed_at` is null, they're red
 ## Provisioning details
 
 `provisionTenant(email)` is in `src/tenant/store.ts`:
-1. Derives a tenant `name` from the email's local part (e.g., `ayushgupta0610@gmail.com` → `ayushgupta0610`)
+1. Derives a tenant `name` from the email's local part (e.g., `alice@example.com` → `alice`)
 2. Derives a unique `slug` by appending `-2`, `-3`, … if needed
 3. Inserts a `tenants` row with default settings (`defaultTenantSettings()`)
 4. Inserts a `memberships` row with `role=owner`

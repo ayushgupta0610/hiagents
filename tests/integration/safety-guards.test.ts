@@ -255,7 +255,7 @@ describe('system sender deny list (deterministic)', () => {
       'bob.smith@acme.com',
       'support-team@vendor.com',
       'ceo@startup.io',
-      'Ayush Gupta <ayushgupta0610@gmail.com>',
+      'Jane Doe <jane.doe@gmail.com>',
       'sales@inbox-ai.dev',
     ];
     for (const email of cases) {

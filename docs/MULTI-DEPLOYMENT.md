@@ -9,7 +9,7 @@ This doc is for the operator standing up a second instance. The original `docs/D
 
 ## When this pattern applies
 
-- You already have one hiagents instance running for an existing customer (e.g. `bot.aiagencycorp.com`) and need to spin up a second under your own brand (`app.hiagents.digital`) without touching the first.
+- You already have one hiagents instance running for an existing customer (e.g. `bot.example.com`) and need to spin up a second under your own brand (`app.hiagents.digital`) without touching the first.
 - You're hosting deployments for multiple clients, each on its own subdomain, and want clean isolation between their data.
 
 If you only have one deployment and want to *swap* its domain, use `scripts/set-deploy-domain.sh` instead — that's for changing the canonical hostname of an existing instance, not adding a second one.
@@ -27,7 +27,7 @@ If you only have one deployment and want to *swap* its domain, use `scripts/set-
 │   └── pm2 process: inbox-ai        └── pm2 process: hiagents-app    │
 │                                                                     │
 │                  ┌─────────  nginx  ─────────┐                      │
-│                  │  bot.aiagencycorp.com →3000│                      │
+│                  │  bot.example.com →3000│                      │
 │                  │  app.hiagents.digital →3001│                      │
 │                  └────────────────────────────┘                     │
 └─────────────────────────────────────────────────────────────────────┘
@@ -65,7 +65,7 @@ Before running any commands on the VPS, have these ready:
 
 ```bash
 cd /root
-git clone git@github.com:ayushgupta0610/inbox-ai.git hiagents-app
+git clone <your-fork-url> hiagents-app
 cd hiagents-app
 npm install
 ```
@@ -170,7 +170,7 @@ curl -sI https://app.hiagents.digital/admin/login | head -5
 # expect: HTTP/1.1 200 OK + your security headers
 ```
 
-Then open `https://app.hiagents.digital/admin/login` in a browser, sign in with a Google account on the new client's Test Users list, and walk through the onboarding wizard. The new deployment should auto-provision a workspace in the *new* Supabase project — **the existing customer on `bot.aiagencycorp.com` does not see this tenant, and vice versa**.
+Then open `https://app.hiagents.digital/admin/login` in a browser, sign in with a Google account on the new client's Test Users list, and walk through the onboarding wizard. The new deployment should auto-provision a workspace in the *new* Supabase project — **the existing customer on `bot.example.com` does not see this tenant, and vice versa**.
 
 ---
 
@@ -213,7 +213,7 @@ If the existing customer ever leaves or moves to the new domain, decommission cl
 ```bash
 pm2 stop inbox-ai
 pm2 delete inbox-ai
-rm /etc/nginx/sites-enabled/bot.aiagencycorp.com
+rm /etc/nginx/sites-enabled/bot.example.com
 systemctl reload nginx
 # (Supabase project A can be deleted or archived once you're sure no data is needed)
 ```

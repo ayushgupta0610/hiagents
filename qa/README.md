@@ -8,7 +8,7 @@ Two layers — automated Playwright tests for everything that doesn't need a rea
 |---|---|---|
 | `01-marketing.spec.ts` | hiagents.digital: hero, anchors, FAQ expand, no app-link leakage, sitemap, robots, OG image, JSON-LD shape, no console errors | none |
 | `02-marketing-form.spec.ts` | Waitlist API: end-to-end Supabase write + Resend `notify` envelope. **Skipped by default** — opt in to actually drop a row. | none |
-| `03-app-public.spec.ts` | bot.aiagencycorp.com: `/health`, login-page render, redirect-when-unauth, API 401 envelopes, CSP / HSTS / X-Frame-Options / Referrer-Policy headers, CSRF guard | none |
+| `03-app-public.spec.ts` | bot.example.com: `/health`, login-page render, redirect-when-unauth, API 401 envelopes, CSP / HSTS / X-Frame-Options / Referrer-Policy headers, CSRF guard | none |
 | `04-oauth-errors.spec.ts` | Every `/oauth/callback?error=…` path renders the styled error card with the right back-button target and copy. Regression suite for commits `d313c55` and `5d657e1`. | none |
 
 24 tests, runs in ~30s headed.
@@ -27,7 +27,7 @@ Override the targets via env (useful for preview deploys):
 
 ```bash
 HIAGENTS_MARKETING_URL=https://hiagents-staging.vercel.app \
-HIAGENTS_APP_URL=https://staging.bot.aiagencycorp.com \
+HIAGENTS_APP_URL=https://staging.bot.example.com \
 npm test
 ```
 

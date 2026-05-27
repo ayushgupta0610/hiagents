@@ -35,6 +35,10 @@ const envSchema = z.object({
 
   // Poller cadence (applies to every tenant)
   POLL_INTERVAL_SECONDS: z.coerce.number().int().positive().default(60),
+
+  // Optional contact email shown on user-facing OAuth error pages. If unset,
+  // the relevant "email us if this keeps happening" sentences are omitted.
+  SUPPORT_EMAIL: z.email().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
