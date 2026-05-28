@@ -40,10 +40,15 @@ async function runWithConcurrency<T>(
   await Promise.all(workers);
 }
 
-async function processTenant(tenant: Tenant, ownerEmail: string): Promise<void> {
+interface Owner {
+  email: string;
+  connectedAt: Date;
+}
+
+async function processTenant(tenant: Tenant, owner: Owner): Promise<void> {
   let ids: string[];
   try {
-    ids = await listUnreadInbox(tenant.id, 25);
+    ids = await listUnreadInbox(tenant.id, owner.connectedAt, 25);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     logger.warn({ tenantId: tenant.id, err: msg }, 'poll: list inbox failed; skipping this tick');
@@ -55,7 +60,7 @@ async function processTenant(tenant: Tenant, ownerEmail: string): Promise<void> 
   for (const id of ids) {
     try {
       const email = await fetchMessage(tenant.id, id);
-      await runPipeline({ tenant, ownerEmail }, email);
+      await runPipeline({ tenant, ownerEmail: owner.email }, email);
       // Intentionally NOT touching the user's mailbox state:
       //   - no applyLabel() — labels are clutter; same info lives on each
       //     `messages` row (classification + reply_status) and shows in the
@@ -85,10 +90,19 @@ async function tick(): Promise<void> {
     const tenants = await listOnboardedTenants();
     if (tenants.length === 0) return;
 
-    const { data: tokens } = await db().from('oauth_tokens').select('tenant_id, email');
-    const ownerByTenant = new Map<string, string>();
-    for (const row of (tokens ?? []) as Array<{ tenant_id: string; email: string }>) {
-      ownerByTenant.set(row.tenant_id, row.email);
+    const { data: tokens } = await db()
+      .from('oauth_tokens')
+      .select('tenant_id, email, connected_at');
+    const ownerByTenant = new Map<string, Owner>();
+    for (const row of (tokens ?? []) as Array<{
+      tenant_id: string;
+      email: string;
+      connected_at: string;
+    }>) {
+      ownerByTenant.set(row.tenant_id, {
+        email: row.email,
+        connectedAt: new Date(row.connected_at),
+      });
     }
 
     const eligible = tenants.filter((t) => {

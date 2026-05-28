@@ -73,7 +73,7 @@ export function defaultTenantSettings(): TenantSettings {
     },
     limits: {
       dailyEmailCap: 200,
-      perSenderDailyReplyCap: 5,
+      perSenderDailyReplyCap: 15,
       totalChunkCap: 5000,
       maxPdfBytes: 25 * 1024 * 1024,
       dailySpendCapUsd: 5,

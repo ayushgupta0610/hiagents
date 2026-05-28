@@ -1,5 +1,6 @@
 import { db } from '../db/client.js';
 import { defaultTenantSettings, withDefaults, type TenantSettings } from './types.js';
+import { bumpConnectedAt } from '../providers/gmail.js';
 
 export interface Tenant {
   id: string;
@@ -207,6 +208,13 @@ export async function updateSettings(
   const { error } = await db().from('tenants').update({ settings: merged }).eq('id', tenantId);
   if (error) throw new Error(`updateSettings: ${error.message}`);
   invalidateTenantCache(tenantId);
+
+  // Resuming from a paused state advances the inbox watermark so the bot
+  // doesn't catch up on mail that arrived during the pause.
+  if (tenant.settings.polling.paused && !merged.polling.paused) {
+    await bumpConnectedAt(tenantId);
+  }
+
   return merged;
 }
 

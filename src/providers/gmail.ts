@@ -161,6 +161,7 @@ export async function saveTokensForTenant(
   },
   email: string,
 ): Promise<void> {
+  const now = new Date().toISOString();
   await db()
     .from('oauth_tokens')
     .upsert(
@@ -171,10 +172,18 @@ export async function saveTokensForTenant(
         expires_at: new Date(tokens.expiry_date).toISOString(),
         scope: tokens.scope,
         email,
-        updated_at: new Date().toISOString(),
+        updated_at: now,
+        connected_at: now,
       },
       { onConflict: 'tenant_id' },
     );
+}
+
+export async function bumpConnectedAt(tenantId: string): Promise<void> {
+  await db()
+    .from('oauth_tokens')
+    .update({ connected_at: new Date().toISOString() })
+    .eq('tenant_id', tenantId);
 }
 
 async function getGmailClientForTenant(tenantId: string): Promise<gmail_v1.Gmail> {
@@ -219,11 +228,16 @@ function headersToMap(
   return map;
 }
 
-export async function listUnreadInbox(tenantId: string, maxResults = 25): Promise<string[]> {
+export async function listUnreadInbox(
+  tenantId: string,
+  connectedAt: Date,
+  maxResults = 25,
+): Promise<string[]> {
   const gmail = await getGmailClientForTenant(tenantId);
+  const afterSeconds = Math.floor(connectedAt.getTime() / 1000);
   const res = await gmail.users.messages.list({
     userId: 'me',
-    q: 'in:inbox is:unread -category:promotions -category:social',
+    q: `in:inbox is:unread -category:promotions -category:social after:${afterSeconds}`,
     maxResults,
   });
   return (res.data.messages ?? [])
