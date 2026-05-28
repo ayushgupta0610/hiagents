@@ -17,7 +17,12 @@ export interface ChatOptions {
 
 interface OpenRouterResponse {
   choices: Array<{ message: { content: string } }>;
-  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+    cost?: number;
+  };
 }
 
 export async function chat(opts: ChatOptions): Promise<string> {
@@ -26,6 +31,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
     messages: opts.messages,
     temperature: opts.temperature ?? 0.3,
     max_tokens: opts.maxTokens ?? 1024,
+    usage: { include: true },
   };
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
@@ -52,6 +58,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
       kind: opts.kind ?? 'chat',
       promptTokens: json.usage?.prompt_tokens ?? 0,
       completionTokens: json.usage?.completion_tokens ?? 0,
+      costUsd: json.usage?.cost ?? 0,
     });
   }
 

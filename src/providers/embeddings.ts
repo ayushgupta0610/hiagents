@@ -1,5 +1,6 @@
 import { env } from '../config.js';
 import { recordUsage } from '../tenant/usage.js';
+import { priceFor } from './pricing.js';
 
 const MODEL = 'openai/text-embedding-3-small';
 const DIMENSIONS = 1536;
@@ -42,12 +43,14 @@ export async function embed(texts: string[], tenantId?: string): Promise<number[
   }
 
   if (tenantId) {
+    const costUsd = await priceFor(MODEL, totalTokens, 0);
     await recordUsage({
       tenantId,
       model: MODEL,
       kind: 'embedding',
       promptTokens: totalTokens,
       completionTokens: 0,
+      costUsd,
     });
   }
 
