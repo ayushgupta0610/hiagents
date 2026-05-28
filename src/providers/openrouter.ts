@@ -1,5 +1,6 @@
 import { env } from '../config.js';
 import { recordUsage } from '../tenant/usage.js';
+import { priceFor } from './pricing.js';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -52,13 +53,17 @@ export async function chat(opts: ChatOptions): Promise<string> {
   if (!content) throw new Error('OpenRouter returned no content');
 
   if (opts.tenantId) {
+    const promptTokens = json.usage?.prompt_tokens ?? 0;
+    const completionTokens = json.usage?.completion_tokens ?? 0;
+    const costUsd =
+      json.usage?.cost ?? (await priceFor(opts.model, promptTokens, completionTokens));
     await recordUsage({
       tenantId: opts.tenantId,
       model: opts.model,
       kind: opts.kind ?? 'chat',
-      promptTokens: json.usage?.prompt_tokens ?? 0,
-      completionTokens: json.usage?.completion_tokens ?? 0,
-      costUsd: json.usage?.cost ?? 0,
+      promptTokens,
+      completionTokens,
+      costUsd,
     });
   }
 

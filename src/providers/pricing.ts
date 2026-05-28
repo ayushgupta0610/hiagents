@@ -21,6 +21,16 @@ interface ModelsResponse {
 const TTL_MS = 24 * 60 * 60 * 1000;
 const EMPTY: Catalog = { fetchedAt: 0, models: new Map() };
 
+// Models that OpenRouter doesn't expose via /api/v1/models — embeddings live
+// at /api/v1/embeddings and don't get listed in the chat-model catalog.
+// Prices below are per-token (USD) sourced from the upstream provider's
+// public pricing. Add new entries here if you wire up another embedding /
+// uncatalogued model.
+const FALLBACK_PRICING: Record<string, ModelPricing> = {
+  'openai/text-embedding-3-small': { prompt: 0.02 / 1_000_000, completion: 0 },
+  'openai/text-embedding-3-large': { prompt: 0.13 / 1_000_000, completion: 0 },
+};
+
 let cached: Catalog | null = null;
 let inflight: Promise<Catalog> | null = null;
 
@@ -66,7 +76,7 @@ export async function priceFor(
   completionTokens: number
 ): Promise<number> {
   const catalog = await getCatalog();
-  const p = catalog.models.get(model);
+  const p = catalog.models.get(model) ?? FALLBACK_PRICING[model];
   if (!p) {
     logger.warn({ model }, 'pricing catalog miss — recording cost as 0');
     return 0;
